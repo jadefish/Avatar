@@ -1,17 +1,21 @@
-PROJECT = Avatar
+PROJECT := avatar
+PKG := github.com/jadefish/$(PROJECT)/cmd/$(PROJECT)
+
+# Go and dep:
 GO ?= $(shell command -v go)
 DEP ?= $(shell command -v dep)
-DOCKER_COMPOSE ?= $(shell command -v docker-compose)
 
+# Platform and architecture:
 GOOS ?= linux
 GOARCH ?= amd64
 
-SRC_FILES = $(wilcard **/*.go)
+# Directories and files:
+SRC_FILES = $(wildcard **/*.go)
 BIN_DIR ?= bin
 VENDOR_DIR ?= vendor
-
 TARGET ?= $(BIN_DIR)/$(PROJECT)
 
+# Pretty.
 GREEN := $(shell printf "\033[32m")
 BLUE := $(shell printf "\033[34m")
 RESET := $(shell printf "\033[0m")
@@ -20,12 +24,12 @@ RESET := $(shell printf "\033[0m")
 build: $(TARGET)
 default: $(TARGET)
 
-$(TARGET): go $(BIN_DIR) $(SRC_FILES) fmt vet $(VENDOR_DIR)
+$(TARGET): go $(BIN_DIR) $(SRC_FILES) $(VENDOR_DIR) fmt vet
 	$(info $(BLUE)Building for:$(RESET) $(GOOS)/$(GOARCH))
-	env GOOS=$(GOOS) GOARCH=$(GOARCH) $(GO) build -o $@ -v
+	env GOOS=$(GOOS) GOARCH=$(GOARCH) $(GO) build -o $@ -v $(PKG)
 
 $(BIN_DIR):
-	test -d $@ || mkdir -p $@
+	test -d $(BIN_DIR) || mkdir -p $(BIN_DIR)
 
 $(VENDOR_DIR): dep
 	@$(DEP) ensure
@@ -36,10 +40,6 @@ fmt:
 
 vet:
 	$(GO) vet ./...
-
-deploy: $(TARGET)
-	$(DOCKER_COMPOSE) build
-	$(DOCKER_COMPOSE) up -d
 
 clean:
 	test -d $(BIN_DIR) && $(RM) -r $(BIN_DIR)
@@ -57,11 +57,4 @@ ifdef DEP
 	$(info Found $(GREEN)dep$(RESET): $(DEP))
 else
 	$(error Unable to locate dep)
-endif
-
-docker:
-ifdef DOCKER
-	$(info Found $(GREEN)docker$(RESET): $(DOCKER))
-else
-	$(error Unable to locate docker)
 endif
