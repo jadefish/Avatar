@@ -21,8 +21,8 @@ func (AccountLoginRequest) Create(p []byte) (*AccountLoginRequest, error) {
 	}
 
 	alr.AccountName = string(p[0:30])
-	alr.AccountPassword = string(p[30:60])
-	alr.NextLoginKey = p[60]
+	alr.AccountPassword = string(p[30:61])
+	alr.NextLoginKey = p[61]
 
 	return alr, nil
 }
