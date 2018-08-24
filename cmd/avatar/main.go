@@ -11,10 +11,8 @@ import (
 )
 
 const (
-	defaultHost          = "0.0.0.0"
-	defaultPort          = "7775"
-	defaultBacklog       = 256
-	maxAccountNameLength = 30
+	defaultHost = "0.0.0.0"
+	defaultPort = "7775"
 )
 
 func getSeed(conn net.Conn) ([4]byte, error) {
