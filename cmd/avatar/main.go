@@ -5,8 +5,8 @@ import (
 	"log"
 	"net"
 
-	"github.com/jadefish/avatar/internal/pkg/crypto"
-	p "github.com/jadefish/avatar/internal/pkg/packets"
+	"github.com/jadefish/avatar/internal/crypto"
+	p "github.com/jadefish/avatar/internal/packets"
 	"github.com/pkg/errors"
 )
 

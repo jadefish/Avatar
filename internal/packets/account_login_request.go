@@ -14,12 +14,12 @@ type AccountLoginRequest struct {
 // Create foo
 func (AccountLoginRequest) Create(p []byte) (*AccountLoginRequest, error) {
 	alr := &AccountLoginRequest{}
-	alr.data = p
 
 	if len(p) != alr.Length() {
 		return nil, errors.Wrap(errPacketLengthMismatch, alr.Name())
 	}
 
+	alr.data = p
 	alr.AccountName = string(p[0:30])
 	alr.AccountPassword = string(p[30:61])
 	alr.NextLoginKey = p[61]
@@ -39,5 +39,5 @@ func (AccountLoginRequest) Name() string {
 
 // Length foo
 func (AccountLoginRequest) Length() int {
-	return 62
+	return 1024
 }

@@ -1,5 +1,9 @@
 package packets
 
+// BufferSize represents the maximum packet length. Any packets received that
+// are longer than this value are invalid.
+const BufferSize = 0xF000
+
 // Packet represents a particular type of client or server packet.
 type Packet interface {
 	From([]byte) (Packet, error)
