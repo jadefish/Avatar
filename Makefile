@@ -1,19 +1,22 @@
 PROJECT := avatar
-PKG := github.com/jadefish/$(PROJECT)/cmd/$(PROJECT)
+PKG := github.com/jadefish
+BINARIES := login
 
 # Go and dep:
 GO ?= $(shell command -v go)
 DEP ?= $(shell command -v dep)
 
-# Platform and architecture:
+# Platform, architecture, and build flags:
 GOOS ?= linux
 GOARCH ?= amd64
+GOFLAGS ?= -v
 
 # Directories and files:
 SRC_FILES = $(wildcard **/*.go)
 BIN_DIR ?= bin
 VENDOR_DIR ?= vendor
-TARGET ?= $(BIN_DIR)/$(PROJECT)
+PKG := $(BINARIES:%=$(PKG)/$(PROJECT)/cmd/%)
+TARGETS := $(BINARIES:%=$(BIN_DIR)/%)
 
 # Pretty.
 GREEN := $(shell printf "\033[32m")
@@ -21,19 +24,19 @@ BLUE := $(shell printf "\033[34m")
 RESET := $(shell printf "\033[0m")
 
 .PHONY: dep go fmt vet deploy clean
-build: $(TARGET)
-default: $(TARGET)
+build: $(TARGETS)
+default: $(TARGETS)
 
-$(TARGET): go $(BIN_DIR) $(SRC_FILES) $(VENDOR_DIR) fmt vet
-	$(info $(BLUE)Building for:$(RESET) $(GOOS)/$(GOARCH))
-	env GOOS=$(GOOS) GOARCH=$(GOARCH) $(GO) build -o $@ -v $(PKG)
+$(TARGETS): go $(BIN_DIR) $(SRC_FILES) $(VENDOR_DIR) fmt vet
+	$(info $(BLUE)Building$(RESET) $@ $(BLUE)for$(RESET) $(GOOS)/$(GOARCH)...)
+	env GOOS=$(GOOS) GOARCH=$(GOARCH) $(GO) build $(GOFLAGS) -o $@ $(PKG)
 
 $(BIN_DIR):
 	test -d $(BIN_DIR) || mkdir -p $(BIN_DIR)
 
 $(VENDOR_DIR): dep
-	@$(DEP) ensure
 	$(info $(BLUE)Fetching dependencies...$(RESET))
+	@$(DEP) ensure
 
 fmt:
 	$(GO) fmt ./...
