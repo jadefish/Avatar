@@ -3,10 +3,13 @@ package crypto
 import (
 	"bufio"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 
+	"github.com/jadefish/avatar"
 	"gopkg.in/yaml.v2"
 )
 
@@ -59,7 +62,14 @@ func LoadClientKeys() {
 }
 
 // GetClientKeyPair returns a pair of client keys for the provided version.
-func GetClientKeyPair(v ClientVersion) ([2]ClientKey, error) {
-	// TODO
-	return [2]ClientKey{0x00, 0x00}, errUnsupportedVersion
+func GetClientKeyPair(v avatar.ClientVersion) ([2]avatar.ClientKey, error) {
+	var b strings.Builder
+	fmt.Fprintf(&b, "%d.%d.%d", v.Major, v.Minor, v.Patch)
+	key := b.String()
+
+	if val, ok := keys[key]; ok {
+		return val, nil
+	}
+
+	return [2]avatar.ClientKey{0x00, 0x00}, errUnsupportedVersion
 }
