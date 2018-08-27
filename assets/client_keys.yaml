@@ -1,7 +1,11 @@
 ---
 # Keys refer to client version numbers (first three fields only).
+#
 # Values are 32-bit integers extracted directly from client binaries. They
 # change with each new client build.
+#
+# All supported clients listed below use TwoFish for login and game packet
+# encryption.
 
 "7.0.67":
   - 0x02118B3CD
