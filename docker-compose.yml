@@ -1,0 +1,8 @@
+---
+version: "3"
+
+services:
+  login:
+    build: .
+    ports:
+      - 7775:7775
