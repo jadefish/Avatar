@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,39 +14,22 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-// ClientVersion represents a client's build number.
-type ClientVersion string
-
-// ClientKey represents a client-side key.
-type ClientKey int
-
 var (
-	keys                  = map[ClientVersion]([2]ClientKey){}
+	keys                  = map[string]([2]avatar.ClientKey){}
 	errUnsupportedVersion = errors.New("Unsupported client version")
-	loader                = &sync.Once{}
+	once                  = &sync.Once{}
 )
 
 // LoadClientKeys reads client key pairs into memory.
 func LoadClientKeys() {
 	// TODO: don't panic.
 
-	loader.Do(func() {
-		exe, err := os.Executable()
-
-		if err != nil {
-			panic(err)
-		}
-
-		dir, err := filepath.Abs(filepath.Dir(exe))
-
-		if err != nil {
-			panic(err)
-		}
-
-		filename := filepath.Join(dir, "assets", "client_keys.yaml")
+	once.Do(func() {
+		filename := filepath.Join(".", "assets", "client_keys.yaml")
 		file, err := os.Open(filename)
 
 		if err != nil {
+			log.Println(err)
 			panic(err)
 		}
 
@@ -56,6 +40,7 @@ func LoadClientKeys() {
 		err = dec.Decode(&keys)
 
 		if err != nil {
+			log.Println(err)
 			panic(err)
 		}
 	})
