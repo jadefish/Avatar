@@ -7,7 +7,18 @@ services:
     build:
       context: .
       dockerfile: ./docker/login/Dockerfile
+    restart: on-failure
     volumes:
       - ./assets:/app/assets
     ports:
       - 7775:7775
+  mysql:
+    container_name: mysql
+    build: ./docker/mysql
+    restart: on-failure
+    volumes:
+      - ./data:/var/lib/mysql
+    ports:
+     - 3306:3306
+    environment:
+      MYSQL_ROOT_PASSWORD: password
