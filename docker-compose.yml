@@ -3,6 +3,9 @@ version: "3"
 
 services:
   login:
-    build: .
+    container_name: login
+    build:
+      context: .
+      dockerfile: ./docker/login/Dockerfile
     ports:
       - 7775:7775
