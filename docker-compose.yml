@@ -7,5 +7,7 @@ services:
     build:
       context: .
       dockerfile: ./docker/login/Dockerfile
+    volumes:
+      - ./assets:/app/assets
     ports:
       - 7775:7775
