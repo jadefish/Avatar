@@ -47,7 +47,6 @@ type Client struct {
 
 	State       State
 	Version     ClientVersion
-	Seed        uint32
 	Crypto      Crypto
 	AccountName string
 	Password    string
@@ -95,8 +94,8 @@ func (c *Client) Read(buf []byte) (int, error) {
 
 	ip := "?"
 
-	if c.Seed > 0 {
-		ip = long2ip(c.Seed)
+	if c.Crypto.Seed > 0 {
+		ip = long2ip(c.Crypto.Seed)
 	}
 
 	log.Printf(

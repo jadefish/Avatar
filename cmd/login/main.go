@@ -44,7 +44,7 @@ func setupClient(c *avatar.Client, buf []byte, n int) error {
 	}
 
 	// n >= 4
-	c.Seed = binary.BigEndian.Uint32(buf2[0:4])
+	c.Crypto.Seed = binary.BigEndian.Uint32(buf2[0:4])
 
 	if n >= 20 {
 		c.Version = avatar.ClientVersion{
@@ -70,8 +70,8 @@ func setupClient(c *avatar.Client, buf []byte, n int) error {
 	}
 
 	// Compute masks:
-	c.Crypto.MaskLo = crypto.GetMaskLo(c.Seed)
-	c.Crypto.MaskHi = crypto.GetMaskHi(c.Seed)
+	c.Crypto.MaskLo = crypto.GetMaskLo(c.Crypto.Seed)
+	c.Crypto.MaskHi = crypto.GetMaskHi(c.Crypto.Seed)
 
 	// Get master keys:
 	keys, err := crypto.GetClientKeyPair(c.Version)
