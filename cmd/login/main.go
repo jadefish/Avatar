@@ -153,7 +153,12 @@ func getAddr() string {
 }
 
 func main() {
-	crypto.LoadClientKeys()
+	err := crypto.LoadClientKeys()
+
+	if err != nil {
+		log.Fatalln(err)
+	}
+
 	l, err := net.Listen("tcp", getAddr())
 
 	if err != nil {

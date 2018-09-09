@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -21,16 +20,16 @@ var (
 )
 
 // LoadClientKeys reads client key pairs into memory.
-func LoadClientKeys() {
-	// TODO: don't panic.
+func LoadClientKeys() error {
+	var e error
 
 	once.Do(func() {
 		filename := filepath.Join("assets", "client_keys.yml")
 		file, err := os.Open(filename)
 
 		if err != nil {
-			log.Println(err)
-			panic(err)
+			e = err
+			return
 		}
 
 		r := bufio.NewReader(file)
@@ -40,10 +39,11 @@ func LoadClientKeys() {
 		err = dec.Decode(&keys)
 
 		if err != nil {
-			log.Println(err)
-			panic(err)
+			e = err
 		}
 	})
+
+	return e
 }
 
 // GetClientKeyPair returns a pair of client keys for the provided version.
