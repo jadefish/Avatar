@@ -2,16 +2,6 @@
 version: "3"
 
 services:
-  login:
-    container_name: login
-    build:
-      context: .
-      dockerfile: ./docker/login/Dockerfile
-    restart: on-failure
-    volumes:
-      - ./assets:/app/assets
-    ports:
-      - 7775:7775
   mysql:
     container_name: mysql
     build: ./docker/mysql
