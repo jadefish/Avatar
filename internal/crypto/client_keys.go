@@ -25,7 +25,7 @@ func LoadClientKeys() {
 	// TODO: don't panic.
 
 	once.Do(func() {
-		filename := filepath.Join(".", "assets", "client_keys.yaml")
+		filename := filepath.Join("assets", "client_keys.yml")
 		file, err := os.Open(filename)
 
 		if err != nil {
