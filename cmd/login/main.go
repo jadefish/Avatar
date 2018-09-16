@@ -40,7 +40,7 @@ func setupClient(c *avatar.Client, buf []byte, n int) error {
 			return errors.New("not enough data")
 		}
 	} else if n == 21 {
-		buf2 = buf[1:21]
+		copy(buf2[:], buf[1:21])
 	}
 
 	// n >= 4
