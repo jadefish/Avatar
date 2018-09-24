@@ -12,4 +12,16 @@
 
 [[constraint]]
   branch = "master"
+  name = "github.com/jmoiron/sqlx"
+
+[[constraint]]
+  name = "github.com/go-sql-driver/mysql"
+  version = "1.4.0"
+
+[[constraint]]
+  branch = "master"
   name = "golang.org/x/crypto"
+
+[[constraint]]
+  branch = "master"
+  name = "github.com/iancoleman/strcase"
