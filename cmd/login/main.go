@@ -1,32 +1,38 @@
 package main
 
 import (
+	"bytes"
 	"encoding/binary"
+	"encoding/hex"
 	"log"
-	"net"
-	"os"
 	"strings"
 
 	"github.com/jadefish/avatar"
-	"github.com/jadefish/avatar/internal/crypto"
+	"github.com/jadefish/avatar/crypto/bcrypt"
+	"github.com/jadefish/avatar/internal/app/login"
+	"github.com/jadefish/avatar/mysql"
+	"github.com/jadefish/avatar/net"
 	"github.com/pkg/errors"
 )
 
-const (
-	defaultHost     = "0.0.0.0"
-	defaultPort     = "7775"
-	maxPacketLength = 0xF000
+var (
+	errInvalidCredentials = errors.New("invalid credentials")
 )
 
-type handlerFunc func(*avatar.Client, []byte, int) error
+type handlerFunc func(*net.Client, []byte, int) error
 
 var packetHandlers = map[byte]handlerFunc{
 	0xEF: setupClient,
+	0x80: loginRequest,
 }
 
-func setupClient(c *avatar.Client, buf []byte, n int) error {
+func setupClient(c *net.Client, buf []byte, n int) error {
 	buf2 := make([]byte, 20)
 
+	// Some clients send 21 bytes all at once, while others send a first byte
+	// followed by the remaining 20 bytes.
+	// Since the first byte is always 0xEF, discard it and read or copy the
+	// remaining 20 bytes:
 	if n == 1 {
 		// Read remaining 20 bytes:
 		n2, err := c.Read(buf2)
@@ -44,22 +50,20 @@ func setupClient(c *avatar.Client, buf []byte, n int) error {
 	}
 
 	// n >= 4
-	c.Crypto.Seed = binary.BigEndian.Uint32(buf2[0:4])
+	seed := binary.BigEndian.Uint32(buf2[0:4])
+	version := &avatar.ClientVersion{}
 
 	if n >= 20 {
-		c.Version = avatar.ClientVersion{
-			Major:    binary.BigEndian.Uint32(buf2[4:8]),
-			Minor:    binary.BigEndian.Uint32(buf2[8:12]),
-			Patch:    binary.BigEndian.Uint32(buf2[12:16]),
-			Revision: binary.BigEndian.Uint32(buf2[16:20]),
-		}
+		// Parse verison:
+		version.Major = binary.BigEndian.Uint32(buf2[4:8])
+		version.Minor = binary.BigEndian.Uint32(buf2[8:12])
+		version.Patch = binary.BigEndian.Uint32(buf2[12:16])
+		version.Revision = binary.BigEndian.Uint32(buf2[16:20])
 	}
 
-	log.Println(c.Version)
-
 	// Read first crypto payload:
-	buf2 = make([]byte, 62)
-	n, err := c.Read(buf2)
+	cSrc := make([]byte, 62)
+	n, err := c.Read(cSrc)
 
 	if err != nil {
 		return err
@@ -69,36 +73,63 @@ func setupClient(c *avatar.Client, buf []byte, n int) error {
 		return errors.New("Unexpected crypto packet length")
 	}
 
-	// Compute masks:
-	c.Crypto.MaskLo = crypto.GetMaskLo(c.Crypto.Seed)
-	c.Crypto.MaskHi = crypto.GetMaskHi(c.Crypto.Seed)
-
-	// Get master keys:
-	keys, err := crypto.GetClientKeyPair(c.Version)
+	// Set up client's cryptography service:
+	crypto, err := login.NewCrypto(seed, version)
 
 	if err != nil {
 		return err
 	}
-
-	c.Crypto.MasterHi, c.Crypto.MasterLo = keys[0], keys[1]
 
 	// Decrypt login credentials:
-	buf3 := make([]byte, len(buf2))
-	err = crypto.LoginDecrypt(&c.Crypto, buf2, buf3)
+	cDest := make([]byte, n)
+	err = crypto.VerifyLogin(cSrc, cDest)
+
+	log.Printf("dest:\n%s\n", hex.Dump(cDest))
 
 	if err != nil {
 		return err
 	}
 
-	c.AccountName = strings.Trim(string(buf3[1:31]), "\000")
-	c.Password = strings.Trim(string(buf3[31:61]), "\000")
+	accountName := strings.Trim(string(cDest[1:31]), "\000")
+	db, err := mysql.Connect()
+
+	if err != nil {
+		return err
+	}
+
+	defer db.Close()
+
+	ps := &bcrypt.PasswordService{}
+	as := &mysql.AccountService{
+		DB:        db,
+		Passwords: ps,
+	}
+	account, err := as.GetAccountByName(accountName)
+
+	if err != nil {
+		return err
+	}
+
+	log.Printf("found account: %+v\n", account)
+
+	// Ensure provided password matches retrieved account's password:
+	password := bytes.Trim(cDest[31:61], "\000")
+
+	if !as.Passwords.ComparePasswords(password, []byte(account.Password)) {
+		return errInvalidCredentials
+	}
 
 	// 0x80: request list of shards
 	// 0x91: request list of characters owned by account on shard?
-	if !(buf3[0] == 0x80 || buf3[0] == 0x91) {
-		return errors.Errorf("Unexpected post-auth packet 0x%x", buf3[0])
+	if !(cDest[0] == 0x80 || cDest[0] == 0x91) {
+		return errors.Errorf("Unexpected post-auth packet 0x%x", cDest[0])
 	}
 
+	return nil
+}
+
+func loginRequest(c *net.Client, buf []byte, n int) error {
+	// TODO
 	return nil
 }
 
@@ -110,14 +141,14 @@ func getHandler(cmd byte) handlerFunc {
 	return nil
 }
 
-func handle(c *avatar.Client) {
+func handle(c *net.Client) {
 	for {
 		buf := make([]byte, avatar.BufferSize)
 		n, err := c.Read(buf)
 
 		if err != nil {
 			log.Println(err)
-			continue
+			return
 		}
 
 		// Handle commands:
@@ -125,7 +156,7 @@ func handle(c *avatar.Client) {
 		handler := getHandler(cmd)
 
 		if handler == nil {
-			err = errors.Errorf("Unknown command %x", cmd)
+			err = errors.Errorf("Unknown command 0x%x", cmd)
 			log.Println(err)
 			continue
 		}
@@ -138,39 +169,35 @@ func handle(c *avatar.Client) {
 			continue
 		}
 
-		log.Printf("done. client: %+v\n", c)
+		// pw, err := bcrypt.GenerateFromPassword([]byte(c.Password), 10)
+		// log.Println("brcypt:", string(pw))
+		//
+		// log.Printf("done. client: %+v\n", c)
+		// err = c.Authenticate()
+		//
+		// if err != nil {
+		// 	log.Println(err)
+		// 	return
+		// } else {
+		// 	log.Println("auth'd successfully")
+		// }
 	}
-}
-
-func getAddr() string {
-	if val, ok := os.LookupEnv("LOGIN_ADDR"); ok {
-		if host, port, err := net.SplitHostPort(val); err == nil {
-			return net.JoinHostPort(host, port)
-		}
-	}
-
-	return net.JoinHostPort(defaultHost, defaultPort)
 }
 
 func main() {
-	err := crypto.LoadClientKeys()
+	server := net.NewServer()
+	err := server.Start()
 
 	if err != nil {
 		log.Fatalln(err)
 	}
 
-	l, err := net.Listen("tcp", getAddr())
+	defer server.Stop()
 
-	if err != nil {
-		log.Fatalln(err)
-	}
-
-	defer l.Close()
-
-	log.Println("Listening on", l.Addr().String())
+	log.Println("Listening on", server.Address())
 
 	for {
-		conn, err := l.Accept()
+		conn, err := server.Accept()
 
 		if err != nil {
 			err = errors.Wrap(err, "accept error")
@@ -179,7 +206,7 @@ func main() {
 			continue
 		}
 
-		client := avatar.New(conn)
+		client := net.NewClient(conn)
 
 		go handle(client)
 	}
