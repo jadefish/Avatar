@@ -56,8 +56,8 @@ func loadClientKeys() error {
 
 		for k, v := range rawKeys {
 			keys[k] = avatar.KeyPair{
-				Lo: v[0],
-				Hi: v[1],
+				Lo: v[1],
+				Hi: v[0],
 			}
 		}
 	})

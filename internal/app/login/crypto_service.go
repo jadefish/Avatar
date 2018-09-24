@@ -24,8 +24,8 @@ func NewCrypto(seed uint32, version *avatar.ClientVersion) (*CryptoService, erro
 		seed:   seed,
 		maskLo: maskLo,
 		maskHi: maskHi,
-		keyLo:  keyPair.Hi,
-		keyHi:  keyPair.Lo,
+		keyLo:  keyPair.Lo,
+		keyHi:  keyPair.Hi,
 	}, nil
 }
 
