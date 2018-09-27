@@ -66,7 +66,7 @@ func loadClientKeys() error {
 }
 
 // getClientKeyPair returns a pair of client keys for the provided version.
-// If no key exists for the provided version, an empty key pair and
+// If no key exists for the provided version, an empty key pair and an
 // "unsupported version" error are returned.
 func getClientKeyPair(v *avatar.ClientVersion) (avatar.KeyPair, error) {
 	b := strings.Builder{}

@@ -5,6 +5,15 @@ import (
 	"github.com/pkg/errors"
 )
 
+const (
+	loMask1 = 0x00001357
+	loMask2 = 0xffffaaaa
+	loMask3 = 0x0000ffff
+	hiMask1 = 0x43210000
+	hiMask2 = 0xabcdffff
+	hiMask3 = 0xffff0000
+)
+
 type CryptoService struct {
 	seed           uint32
 	maskLo, maskHi uint32
@@ -30,11 +39,11 @@ func NewCrypto(seed uint32, version *avatar.ClientVersion) (*CryptoService, erro
 }
 
 func computeMaskLo(seed uint32) uint32 {
-	return ((^seed ^ 0x00001357) << 16) | ((seed ^ 0xffffaaaa) & 0x0000ffff)
+	return ((^seed ^ loMask1) << 16) | ((seed ^ loMask2) & loMask3)
 }
 
 func computeMaskHi(seed uint32) uint32 {
-	return ((seed ^ 0x43210000) >> 16) | ((^seed ^ 0xabcdffff) & 0xffff0000)
+	return ((seed ^ hiMask1) >> 16) | ((^seed ^ hiMask2) & hiMask3)
 }
 
 // GetSeed returns the client's seed.
