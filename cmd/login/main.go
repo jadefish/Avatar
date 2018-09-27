@@ -116,6 +116,8 @@ func setupClient(c *net.Client, buf []byte, n int) error {
 	password := bytes.Trim(cDest[31:61], "\000")
 
 	if !as.Passwords.ComparePasswords(password, []byte(account.Password)) {
+		c.Disconnect(avatar.DisconnectReasonIncorrectPassword)
+
 		return errInvalidCredentials
 	}
 

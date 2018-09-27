@@ -15,6 +15,20 @@ const (
 	StateNormal
 )
 
+// Disconnect reasons
+const (
+	DisconnectReasonIncorrectPassword          = 0x00
+	DisconnectReasonCharacterDoesNotExist      = 0x01
+	DisconnectReasonCharacterAlreadyExists     = 0x02
+	DisconnectReasonGeneric3                   = 0x03
+	DisconnectReasonGeneric4                   = 0x04
+	DisconnectReasonAnotherCharacterIsLoggedIn = 0x05
+	DisconnectReasonSynchronizationError       = 0x06
+	DisconnectReasonIdleTimeout                = 0x07
+	DisconnectReasonGeneric8                   = 0x08
+	DisconnectReasonCharacterTransfer          = 0x09
+)
+
 // BufferSize represents the maximum acceptable length of an incoming packet,
 // in bytes
 const BufferSize = 0xF000
