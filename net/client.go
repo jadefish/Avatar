@@ -61,12 +61,12 @@ func (c *Client) Write(buf []byte) (int, error) {
 	return c.conn.Write(buf)
 }
 
-// Close the connection to the client.
+// Close the client's connection.
 func (c *Client) Close() error {
 	return c.conn.Close()
 }
 
-// Disconnect the client with a reason and closing the connection.
+// Disconnect the client.
 func (c *Client) Disconnect(reason byte) error {
 	_, err := c.conn.Write([]byte{0x53, reason})
 
@@ -74,7 +74,7 @@ func (c *Client) Disconnect(reason byte) error {
 		return errors.Wrap(err, "disconnect")
 	}
 
-	return c.conn.Close()
+	return nil
 }
 
 // GetVersion retrieve's the client's self-reported version.
