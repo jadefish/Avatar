@@ -37,10 +37,12 @@ func computeMaskHi(seed uint32) uint32 {
 	return ((seed ^ 0x43210000) >> 16) | ((^seed ^ 0xabcdffff) & 0xffff0000)
 }
 
+// GetSeed returns the client's seed.
 func (c *CryptoService) GetSeed() uint32 {
 	return c.seed
 }
 
+// GetMasks returns the pair of client masks.
 func (c *CryptoService) GetMasks() avatar.KeyPair {
 	return avatar.KeyPair{
 		Lo: c.maskLo,
@@ -48,6 +50,7 @@ func (c *CryptoService) GetMasks() avatar.KeyPair {
 	}
 }
 
+// GetKeys returns the pair of version-specific client keys.
 func (c *CryptoService) GetKeys() avatar.KeyPair {
 	return avatar.KeyPair{
 		Lo: c.keyLo,
@@ -55,17 +58,23 @@ func (c *CryptoService) GetKeys() avatar.KeyPair {
 	}
 }
 
+// Encrypt data using the client's cryptography facilities.
 func (c *CryptoService) Encrypt(data []byte) ([]byte, error) {
 	// TODO
 	return []byte{0x00}, nil
 }
 
+// Decrypt data using the client's cryptography facilities.
 func (c *CryptoService) Decrypt(data []byte) ([]byte, error) {
 	// TODO
 	return []byte{0x00}, nil
 }
 
+// VerifyLogin verifies that the client's provided login data is valid,
+// decrypting it into plaintext account credentials.
 func (c *CryptoService) VerifyLogin(src, dest []byte) error {
+	// TODO: check client state
+
 	if len(src) != len(dest) {
 		return errors.New("buffer size mismatch")
 	}
