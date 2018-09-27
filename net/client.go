@@ -43,13 +43,7 @@ func (c *Client) Read(buf []byte) (int, error) {
 		return n, errors.New("bad packet length")
 	}
 
-	ip := "?"
-
-	if c.crypto != nil {
-		if seed := c.crypto.GetSeed(); seed > 0 {
-			ip = long2ip(seed)
-		}
-	}
+	ip := c.IPAddress()
 
 	log.Printf(
 		"(%s) Read %d/%d bytes:\n%s\n",
@@ -90,6 +84,17 @@ func (c *Client) GetVersion() avatar.ClientVersion {
 // GetState retireves the current state of the client.
 func (c *Client) GetState() avatar.ClientState {
 	return c.state
+}
+
+// IPAddress returns the IP address of the client.
+func (c *Client) IPAddress() string {
+	ip := "unknown"
+
+	if seed := c.crypto.GetSeed(); seed > 0 {
+		ip = long2ip(seed).String()
+	}
+
+	return ip
 }
 
 func long2ip(long uint32) net.IP {
