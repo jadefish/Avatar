@@ -30,6 +30,7 @@ type Client interface {
 	Disconnect(reason byte) error
 	GetVersion() ClientVersion
 	GetState() ClientState
+	SetState(state ClientState) error
 	IPAddress() net.IP
 }
 

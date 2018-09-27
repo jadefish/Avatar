@@ -87,6 +87,14 @@ func (c *Client) GetState() avatar.ClientState {
 	return c.state
 }
 
+// SetState transitions the client into a new state.
+func (c *Client) SetState(state avatar.ClientState) error {
+	// TODO: validate transition
+	c.state = state
+
+	return nil
+}
+
 // IPAddress returns the IP address of the client.
 func (c *Client) IPAddress() string {
 	ip := "unknown"
