@@ -28,7 +28,7 @@ func Connect() (*sqlx.DB, error) {
 		return nil, err
 	}
 
-	db.MapperFunc(strcase.ToCamel)
+	db.MapperFunc(strcase.ToSnake)
 
 	return db, nil
 }
