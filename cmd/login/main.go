@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/hex"
+	"io"
 	"log"
 	"strings"
 
@@ -148,8 +149,14 @@ func handle(c *net.Client) {
 		buf := make([]byte, avatar.BufferSize)
 		n, err := c.Read(buf)
 
+		if err == io.EOF {
+			c.Close()
+
+			return
+		}
+
 		if err != nil {
-			log.Println(err)
+			log.Println("Read error:", err)
 			return
 		}
 
