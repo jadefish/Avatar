@@ -92,9 +92,9 @@ func (c *Client) GetState() avatar.ClientState {
 	return c.state
 }
 
-func long2ip(long uint32) string {
+func long2ip(long uint32) net.IP {
 	b := make([]byte, 4)
 	binary.BigEndian.PutUint32(b[:], long)
 
-	return net.IP(b).String()
+	return net.IP(b)
 }
