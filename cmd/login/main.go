@@ -50,6 +50,8 @@ func setupClient(c *net.Client, buf []byte, n int) error {
 		copy(buf2[:], buf[1:21])
 	}
 
+	c.SetState(avatar.StateConnecting)
+
 	// n >= 4
 	seed := binary.BigEndian.Uint32(buf2[0:4])
 	version := &avatar.ClientVersion{}
@@ -73,6 +75,8 @@ func setupClient(c *net.Client, buf []byte, n int) error {
 	if n != 62 {
 		return errors.New("Unexpected crypto packet length")
 	}
+
+	c.SetState(avatar.StateAuthenticating)
 
 	// Set up client's cryptography service:
 	crypto, err := login.NewCrypto(seed, version)
@@ -122,6 +126,7 @@ func setupClient(c *net.Client, buf []byte, n int) error {
 		return errInvalidCredentials
 	}
 
+	c.SetState(avatar.StateAuthenticated)
 	// 0x80: request list of shards
 	// 0x91: request list of characters owned by account on shard?
 	if !(cDest[0] == 0x80 || cDest[0] == 0x91) {

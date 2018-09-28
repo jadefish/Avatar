@@ -63,18 +63,24 @@ func (c *Client) Write(buf []byte) (int, error) {
 
 // Close the client's connection.
 func (c *Client) Close() error {
-	return c.conn.Close()
-}
+	err := c.conn.Close()
 
-// Disconnect the client.
-func (c *Client) Disconnect(reason byte) error {
-	_, err := c.conn.Write([]byte{0x53, reason})
-
-	if err != nil {
-		return errors.Wrap(err, "disconnect")
+	if err == nil {
+		c.SetState(avatar.StateDisconnected)
 	}
 
-	return nil
+	return errors.Wrap(err, "close")
+}
+
+// RejectLogin terminates the client's current authentication attempt.
+func (c *Client) RejectLogin(reason avatar.LoginRejectionReason) error {
+	_, err := c.conn.Write([]byte{0x82, byte(reason)})
+
+	if err == nil {
+		c.SetState(avatar.StateDisconnected)
+	}
+
+	return errors.Wrap(err, "disconnect")
 }
 
 // GetVersion retrieve's the client's self-reported version.

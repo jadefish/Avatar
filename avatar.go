@@ -11,8 +11,8 @@ type ClientState uint8
 const (
 	StateDisconnected ClientState = iota
 	StateConnecting
-	StateConnected
-	StateNormal
+	StateAuthenticating
+	StateAuthenticated
 )
 
 // Disconnect reasons
