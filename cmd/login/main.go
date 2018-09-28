@@ -182,19 +182,6 @@ func handle(c *net.Client) {
 			log.Println(err)
 			continue
 		}
-
-		// pw, err := bcrypt.GenerateFromPassword([]byte(c.Password), 10)
-		// log.Println("brcypt:", string(pw))
-		//
-		// log.Printf("done. client: %+v\n", c)
-		// err = c.Authenticate()
-		//
-		// if err != nil {
-		// 	log.Println(err)
-		// 	return
-		// } else {
-		// 	log.Println("auth'd successfully")
-		// }
 	}
 }
 
