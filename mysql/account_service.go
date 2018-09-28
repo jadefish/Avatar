@@ -3,62 +3,74 @@ package mysql
 import (
 	"github.com/jmoiron/sqlx"
 
-	av "github.com/jadefish/avatar"
+	"github.com/jadefish/avatar"
 )
 
 // AccountService facilitates interacting with user accounts.
 type AccountService struct {
 	DB        *sqlx.DB
-	Passwords av.PasswordService
+	Passwords avatar.PasswordService
 }
 
 // GetAccountByID retrieves an account by its ID.
-func (s *AccountService) GetAccountByID(id int) (*av.Account, error) {
-	var account av.Account
+func (s *AccountService) GetAccountByID(id int) (*avatar.Account, error) {
+	account := &avatar.Account{}
 
-	err := s.DB.Get(&account, `
+	err := s.DB.Get(account, `
 		SELECT a.*
 		FROM accounts a
 		WHERE a.id = ?;
 	`, id)
 
+	if account.ID == 0 {
+		return nil, avatar.ErrNoAccountFound
+	}
+
 	if err != nil {
 		return nil, err
 	}
 
-	return &account, nil
+	return account, nil
 }
 
 // GetAccountByEmail retrieves an account by its email.
-func (s *AccountService) GetAccountByEmail(email string) (*av.Account, error) {
-	var account av.Account
+func (s *AccountService) GetAccountByEmail(email string) (*avatar.Account, error) {
+	account := &avatar.Account{}
 
-	err := s.DB.Get(&account, `
+	err := s.DB.Get(account, `
 		SELECT a.*
 		FROM accounts a
 		WHERE a.email= ?;
 	`, email)
 
+	if account.ID == 0 {
+		return nil, avatar.ErrNoAccountFound
+	}
+
 	if err != nil {
 		return nil, err
 	}
 
-	return &account, nil
+	return account, nil
 }
 
 // GetAccountByName retrieves an account by its name.
-func (s *AccountService) GetAccountByName(name string) (*av.Account, error) {
-	var account av.Account
+func (s *AccountService) GetAccountByName(name string) (*avatar.Account, error) {
+	account := &avatar.Account{}
 
-	err := s.DB.Get(&account, `
+	err := s.DB.Get(account, `
 		SELECT a.*
 		FROM accounts a
 		WHERE a.name = ?;
 	`, name)
 
+	if account.ID == 0 {
+		return nil, avatar.ErrNoAccountFound
+	}
+
 	if err != nil {
 		return nil, err
 	}
 
-	return &account, nil
+	return account, nil
 }

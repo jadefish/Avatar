@@ -1,6 +1,7 @@
 package avatar
 
 import (
+	"errors"
 	"net"
 	"time"
 )
@@ -27,6 +28,10 @@ const (
 	DisconnectReasonIdleTimeout                = 0x07
 	DisconnectReasonGeneric8                   = 0x08
 	DisconnectReasonCharacterTransfer          = 0x09
+
+var (
+	ErrNoAccountFound     = errors.New("no account found")
+	ErrInvalidCredentials = errors.New("invalid credentials")
 )
 
 // BufferSize represents the maximum acceptable length of an incoming packet,
