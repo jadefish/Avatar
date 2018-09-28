@@ -16,18 +16,35 @@ const (
 	StateAuthenticated
 )
 
-// Disconnect reasons
+type PopupMessageID byte
+
+// Popup messages
 const (
-	DisconnectReasonIncorrectPassword          = 0x00
-	DisconnectReasonCharacterDoesNotExist      = 0x01
-	DisconnectReasonCharacterAlreadyExists     = 0x02
-	DisconnectReasonGeneric3                   = 0x03
-	DisconnectReasonGeneric4                   = 0x04
-	DisconnectReasonAnotherCharacterIsLoggedIn = 0x05
-	DisconnectReasonSynchronizationError       = 0x06
-	DisconnectReasonIdleTimeout                = 0x07
-	DisconnectReasonGeneric8                   = 0x08
-	DisconnectReasonCharacterTransfer          = 0x09
+	PopupMessageIncorrectPassword PopupMessageID = iota
+	PopupMessageCharacterDoesNotExist
+	PopupMessageCharacterAlreadyExists
+	PopupMessageGeneric3
+	PopupMessageGeneric4
+	PopupMessageAnotherCharacterIsLoggedIn
+	PopupMessageSynchronizationError
+	PopupMessageIdleTimeout
+	PopupMessageGeneric8
+	PopupMessageCharacterTransfer
+)
+
+type LoginRejectionReason byte
+
+// Login rejection reasons
+const (
+	LoginRejectionInvalidAccount LoginRejectionReason = iota
+	LoginRejectionAccountInUse
+	LoginRejectionAccountBlocked
+	LoginRejectionInvalidPassword
+	LoginRejectionCommunicationProblem
+	LoginRejectionIGRConcurrencyLimitMet
+	LoginRejectionIGRTimeLimitMet
+	LoginRejectionIGRGeneralAuthFailure
+)
 
 var (
 	ErrNoAccountFound     = errors.New("no account found")
@@ -46,7 +63,7 @@ type Client interface {
 	Read(p []byte) (n int, err error)
 	Write(p []byte) (n int, err error)
 	Close() error
-	Disconnect(reason byte) error
+	RejectLogin(reason LoginRejectionReason) error
 	GetVersion() ClientVersion
 	GetState() ClientState
 	SetState(state ClientState) error

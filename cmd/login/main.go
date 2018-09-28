@@ -112,6 +112,10 @@ func setupClient(c *net.Client, buf []byte, n int) error {
 	account, err := as.GetAccountByName(accountName)
 
 	if err != nil {
+		if err == avatar.ErrNoAccountFound {
+			c.RejectLogin(avatar.LoginRejectionInvalidAccount)
+		}
+
 		return err
 	}
 
@@ -121,12 +125,15 @@ func setupClient(c *net.Client, buf []byte, n int) error {
 	password := bytes.Trim(cDest[31:61], "\000")
 
 	if !as.Passwords.ComparePasswords(password, []byte(account.Password)) {
-		c.Disconnect(avatar.DisconnectReasonIncorrectPassword)
+		c.RejectLogin(avatar.LoginRejectionInvalidPassword)
 
 		return errInvalidCredentials
 	}
 
 	c.SetState(avatar.StateAuthenticated)
+
+	// TODO: reject login if account is blocked
+
 	// 0x80: request list of shards
 	// 0x91: request list of characters owned by account on shard?
 	if !(cDest[0] == 0x80 || cDest[0] == 0x91) {
