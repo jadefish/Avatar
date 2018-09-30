@@ -74,6 +74,12 @@ func (c *Client) Close() error {
 
 // RejectLogin terminates the client's current authentication attempt.
 func (c *Client) RejectLogin(reason avatar.LoginRejectionReason) error {
+	// It is invalid to reject a login process for a client that has already
+	// logged in.
+	if c.GetState() > avatar.StateAuthenticating {
+		return nil
+	}
+
 	_, err := c.conn.Write([]byte{0x82, byte(reason)})
 
 	if err == nil {
