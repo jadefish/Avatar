@@ -94,12 +94,17 @@ type Account struct {
 	ID             int
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
+	DeletedAt      *time.Time
 	LastLoggedInAt *time.Time
 	Name           string
 	Email          string
 	Password       string
 	CreationIP     net.IP
 	LastLoginIP    *net.IP
+}
+
+func (a *Account) IsDeleted() bool {
+	return a.DeletedAt != nil
 }
 
 type AccountService interface {
