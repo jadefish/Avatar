@@ -49,6 +49,7 @@ const (
 var (
 	ErrNoAccountFound     = errors.New("no account found")
 	ErrInvalidCredentials = errors.New("invalid credentials")
+	ErrInvalidClientState = errors.New("invalid client state")
 )
 
 // BufferSize represents the maximum acceptable length of an incoming packet,
