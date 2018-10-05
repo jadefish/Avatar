@@ -24,9 +24,8 @@ type Client struct {
 // NewClient creates a new client for the provided connection.
 func NewClient(conn net.Conn) *Client {
 	client := &Client{
-		conn:   conn,
-		state:  avatar.StateDisconnected,
-		crypto: &login.CryptoService{},
+		conn:  conn,
+		state: avatar.StateDisconnected,
 	}
 
 	return client
