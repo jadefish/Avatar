@@ -10,7 +10,6 @@ import (
 
 	"github.com/jadefish/avatar"
 	"github.com/jadefish/avatar/crypto/bcrypt"
-	"github.com/jadefish/avatar/internal/app/login"
 	"github.com/jadefish/avatar/mysql"
 	"github.com/jadefish/avatar/net"
 	"github.com/pkg/errors"
@@ -79,7 +78,7 @@ func setupClient(c *net.Client, buf []byte, n int) error {
 	c.SetState(avatar.StateAuthenticating)
 
 	// Set up client's cryptography service:
-	crypto, err := login.NewCrypto(seed, version)
+	err = c.NewCrypto(seed, version)
 
 	if err != nil {
 		return err
@@ -87,7 +86,7 @@ func setupClient(c *net.Client, buf []byte, n int) error {
 
 	// Decrypt login credentials:
 	cDest := make([]byte, n)
-	err = crypto.VerifyLogin(cSrc, cDest)
+	err = c.GetCrypto().VerifyLogin(cSrc, cDest)
 
 	log.Printf("dest:\n%s\n", hex.Dump(cDest))
 
@@ -139,6 +138,10 @@ func setupClient(c *net.Client, buf []byte, n int) error {
 	if !(cDest[0] == 0x80 || cDest[0] == 0x91) {
 		return errors.Errorf("Unexpected post-auth packet 0x%x", cDest[0])
 	}
+
+	// TODO: Send "client verison request"
+	// TODO: find method of executing handlers that don't depend on first byte
+	// TODO: attempt to decrypt client response of version request with golang.org/x/crypto/blowfish (key: client seed)
 
 	return nil
 }

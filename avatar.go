@@ -6,16 +6,6 @@ import (
 	"time"
 )
 
-type ClientState uint8
-
-// Client states
-const (
-	StateDisconnected ClientState = iota
-	StateConnecting
-	StateAuthenticating
-	StateAuthenticated
-)
-
 type PopupMessageID byte
 
 // Popup messages
@@ -57,30 +47,9 @@ var (
 const BufferSize = 0xF000
 
 type Server interface {
-	AddClient(Client) error
-}
-
-type Client interface {
-	Read(p []byte) (n int, err error)
-	Write(p []byte) (n int, err error)
-	Close() error
-	RejectLogin(reason LoginRejectionReason) error
-	GetVersion() ClientVersion
-	GetState() ClientState
-	SetState(state ClientState) error
-	IPAddress() net.IP
-}
-
-type CryptoService interface {
-	GetSeed() uint32
-	GetMasks() KeyPair
-	GetKeys() KeyPair
-	Encrypt(data []byte) ([]byte, error)
-	Decrypt(data []byte) ([]byte, error)
-}
-
-type KeyPair struct {
-	Lo, Hi uint32
+	AddClient(client Client) error
+	FindClient(seed uint32) (*Client, error)
+	GetClientsByState(state ClientState) ([]*Client, error)
 }
 
 // ClientVersion represents a client's self-declared version.

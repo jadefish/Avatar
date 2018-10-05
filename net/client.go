@@ -117,6 +117,22 @@ func (c *Client) IPAddress() string {
 	return ip
 }
 
+func (c *Client) NewCrypto(seed uint32, version *avatar.ClientVersion) error {
+	crypto, err := login.NewCrypto(seed, version)
+
+	if err != nil {
+		return err
+	}
+
+	c.crypto = crypto
+
+	return err
+}
+
+func (c *Client) GetCrypto() avatar.CryptoService {
+	return c.crypto
+}
+
 func long2ip(long uint32) net.IP {
 	b := make([]byte, 4)
 	binary.BigEndian.PutUint32(b[:], long)
