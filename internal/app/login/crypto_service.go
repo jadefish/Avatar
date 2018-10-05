@@ -15,6 +15,8 @@ const (
 )
 
 type CryptoService struct {
+	avatar.CryptoService
+
 	seed           uint32
 	maskLo, maskHi uint32
 	keyLo, keyHi   uint32
