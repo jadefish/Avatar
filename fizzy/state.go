@@ -26,8 +26,8 @@ func newState(name string) (*state, error) {
 }
 
 func (from *state) canTransitionTo(to *state) bool {
-	for range from.destinations {
-		if from.name == to.name {
+	for _, candidate := range from.destinations {
+		if candidate.name == to.name {
 			return true
 		}
 	}
