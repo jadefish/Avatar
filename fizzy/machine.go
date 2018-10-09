@@ -51,12 +51,9 @@ func (m *Machine) getState(name string) (*state, bool) {
 
 // NewMachine creates a new Moore machine.
 func NewMachine(initial string) (*Machine, error) {
-	states := make([]*state, 10)
-	events := make(map[string][]*event, 20)
-
 	m := &Machine{
-		states: states,
-		events: events,
+		states: []*state{},
+		events: map[string][]*event{},
 	}
 	err := m.AddState(initial)
 
