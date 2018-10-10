@@ -7,6 +7,11 @@ import (
 
 var errEmptyStateName = errors.New("empty state name")
 
+var emptyState = &state{
+	name:         "",
+	destinations: []*state{},
+}
+
 type state struct {
 	name         string
 	destinations []*state
