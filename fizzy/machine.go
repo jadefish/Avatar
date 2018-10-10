@@ -83,11 +83,9 @@ func (m *Machine) AddState(name string) error {
 
 	m.states = append(m.states, state)
 
-	// If the newly-added state is the only state, it is the initial and
-	// current state:
-	if len(m.states) == 1 {
+	// Flag the first state as the machine's initial state:
+	if m.initial == nil {
 		m.initial = state
-		m.current = state
 	}
 
 	return nil
@@ -121,20 +119,17 @@ func (m *Machine) Current() string {
 	return m.current.name
 }
 
-// Start the machine, preventing further mutation and allowing transition.
+// Start the machine, preventing further mutation, transitioning it into its
+// initial state, and allowing for further transition.
 func (m *Machine) Start() error {
 	if m.started {
 		return errors.Wrap(errMachineStarted, "start")
 	}
 
+	m.current = m.initial
 	m.started = true
 
 	return nil
-}
-
-// Started determines whether the machine has been started.
-func (m *Machine) Started() bool {
-	return m.started
 }
 
 // On invokes `fn` when the machine makes the provided transition.
