@@ -1,7 +1,7 @@
 package fizzy
 
-type transitionFunc func(prev string)
+type TransitionCallbackFunc func(m FiniteStateMachine, from, to string)
 type event struct {
-	from, to *state
-	fn       transitionFunc
+	from, to State
+	fn       TransitionCallbackFunc
 }

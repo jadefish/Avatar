@@ -4,42 +4,48 @@ import (
 	"github.com/pkg/errors"
 )
 
-// MooreMachine is a finite-state machine.
-type MooreMachine interface {
-	AddState(string) error
-	AddTransition(from, to string) error
+// FiniteStateMachine is an abstract model of computation capable of
+// transitioning between states in response to input.
+type FiniteStateMachine interface {
+	transition(to string) error
+
+	AddState(name string, output interface{}) error
+	AddTransition(from, to, input string) error
 	Current() string
-	Transition(to string) error
+	Output(input interface{}) interface{}
+	Start() error
 }
 
-// Machine is an implementation of a Moore machine.
-type Machine struct {
-	MooreMachine
+// MooreMachine is a finite-state machine whose output is determined only by
+// its current state.
+type MooreMachine struct {
+	FiniteStateMachine
 
 	started bool
-	current *state
-	initial *state
-	states  []*state
+	current *mooreState
+	initial *mooreState
+	states  []*mooreState
 	events  map[string][]*event
 }
 
-var _ = &Machine{}
+var _ = &MooreMachine{}
 
 var (
-	errNotStarted        = errors.New("machine is not started")
-	errMachineStarted    = errors.New("started machine cannot be modified")
-	errUnknownState      = errors.New("unknown state")
-	errDuplicateState    = errors.New("duplicate state")
-	errInvalidTransition = errors.New("invalid transition")
+	errNotStarted          = errors.New("machine is not started")
+	errMachineStarted      = errors.New("started machine cannot be modified")
+	errUnknownState        = errors.New("unknown state")
+	errDuplicateState      = errors.New("duplicate state")
+	errDuplicateTransition = errors.New("duplicate transition")
+	errInvalidTransition   = errors.New("invalid transition")
 )
 
-func (m *Machine) hasState(name string) bool {
+func (m *MooreMachine) hasState(name string) bool {
 	_, ok := m.getState(name)
 
 	return ok
 }
 
-func (m *Machine) getState(name string) (*state, bool) {
+func (m *MooreMachine) getState(name string) (*mooreState, bool) {
 	for _, state := range m.states {
 		if state.name == name {
 			return state, true
@@ -50,13 +56,13 @@ func (m *Machine) getState(name string) (*state, bool) {
 }
 
 // NewMachine creates a new Moore machine.
-func NewMachine(initial string) (*Machine, error) {
-	m := &Machine{
+func NewMachine(initial string) (*MooreMachine, error) {
+	m := &MooreMachine{
 		current: emptyState,
-		states:  []*state{},
+		states:  []*mooreState{},
 		events:  map[string][]*event{},
 	}
-	err := m.AddState(initial)
+	err := m.AddState(initial, nil)
 
 	if err != nil {
 		return nil, err
@@ -66,7 +72,7 @@ func NewMachine(initial string) (*Machine, error) {
 }
 
 // AddState adds a state to the machine.
-func (m *Machine) AddState(name string) error {
+func (m *MooreMachine) AddState(name string, output interface{}) error {
 	if m.started {
 		return errors.Wrap(errMachineStarted, "add state")
 	}
@@ -75,7 +81,7 @@ func (m *Machine) AddState(name string) error {
 		return errors.Wrap(errDuplicateState, name)
 	}
 
-	state, err := newState(name)
+	state, err := newState(name, output)
 
 	if err != nil {
 		return errors.Wrap(err, "add state")
@@ -92,7 +98,7 @@ func (m *Machine) AddState(name string) error {
 }
 
 // AddTransition allows the machine to transition from one state to another.
-func (m *Machine) AddTransition(from, to string) error {
+func (m *MooreMachine) AddTransition(from, to, input string) error {
 	if m.started {
 		return errors.Wrap(errMachineStarted, "add transition")
 	}
@@ -109,19 +115,23 @@ func (m *Machine) AddTransition(from, to string) error {
 		return errors.Wrap(errUnknownState, to)
 	}
 
-	stateFrom.destinations = append(stateFrom.destinations, stateTo)
+	if _, ok := stateFrom.destinations[input]; ok {
+		return errors.Wrap(errDuplicateTransition, "add transition")
+	}
+
+	stateFrom.destinations[input] = stateTo
 
 	return nil
 }
 
 // Current retrieves the machine's current state.
-func (m *Machine) Current() string {
+func (m *MooreMachine) Current() string {
 	return m.current.name
 }
 
 // Start the machine, preventing further mutation, transitioning it into its
 // initial state, and allowing for further transition.
-func (m *Machine) Start() error {
+func (m *MooreMachine) Start() error {
 	if m.started {
 		return errors.Wrap(errMachineStarted, "start")
 	}
@@ -133,7 +143,7 @@ func (m *Machine) Start() error {
 }
 
 // On invokes `fn` when the machine makes the provided transition.
-func (m *Machine) On(from, to string, fn transitionFunc) error {
+func (m *MooreMachine) On(from, to string, fn TransitionCallbackFunc) error {
 	stateFrom, ok := m.getState(from)
 
 	if !ok {
@@ -155,31 +165,36 @@ func (m *Machine) On(from, to string, fn transitionFunc) error {
 	m.events[from] = append(m.events[from], e)
 
 	return nil
+
+}
+
+func (m *MooreMachine) next(input string) (*mooreState, error) {
+	next, ok := m.current.destinations[input]
+
+	if !ok {
+		return nil, errors.Wrap(errInvalidTransition, "next")
+	}
+
+	return next, nil
+}
+
+func (m *MooreMachine) Output(input interface{}) interface{} {
+	return m.current.Output(input)
 }
 
 // Transition the machine from its current state to a new state.
-func (m *Machine) Transition(to string) error {
+func (m *MooreMachine) Transition(input string) (interface{}, error) {
 	if !m.started {
-		return errors.Wrap(errNotStarted, "transition")
+		return nil, errors.Wrap(errNotStarted, "transition")
 	}
 
-	toState, ok := m.getState(to)
+	dest, err := m.next(input)
 
-	if !ok {
-		return errors.Wrap(errUnknownState, "transition")
+	if err != nil {
+		return nil, errors.Wrap(err, "transition")
 	}
 
-	if !m.current.canTransitionTo(toState) {
-		return errors.Wrap(errInvalidTransition, to)
-	}
+	m.current = dest
 
-	old := m.current
-	m.current = toState
-
-	// Invoke transition callbacks:
-	for _, e := range m.events[old.name] {
-		e.fn(old.name)
-	}
-
-	return nil
+	return m.Output(input), nil
 }

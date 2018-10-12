@@ -27,7 +27,7 @@ func TestMachine_AddState(t *testing.T) {
 
 	// Adding a state to a started machine should fail.
 	m.Start()
-	err := m.AddState("s1")
+	err := m.AddState("s1", 1)
 
 	if err == nil {
 		t.Error("AddState allowed mutation of a started machine")
@@ -35,7 +35,7 @@ func TestMachine_AddState(t *testing.T) {
 
 	// Adding a duplicate state should fail.
 	m, _ = NewMachine("s0")
-	err = m.AddState("s0")
+	err = m.AddState("s0", 0)
 
 	if err == nil {
 		t.Error("AddState allowed a duplicate state to be added")
