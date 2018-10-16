@@ -184,7 +184,7 @@ func (m *MooreMachine) Transition(input string) (interface{}, error) {
 }
 
 // On invokes `fn` when the machine makes the provided transition.
-func (m *MooreMachine) On(from, to string, callback EventCallback) error {
+func (m *MooreMachine) On(from, to string, callback eventCallback) error {
 	if m.started {
 		return errors.Wrap(errMachineStarted, "on")
 	}
