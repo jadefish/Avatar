@@ -4,29 +4,29 @@ import (
 	"testing"
 )
 
-func TestNewMachine(t *testing.T) {
-	m := NewMachine()
+func TestNewMooreMachine(t *testing.T) {
+	m := NewMooreMachine()
 
 	if m.initial != nil {
-		t.Error("NewMachine constructed a machine with a non-empty initial state")
+		t.Error("NewMooreMachine constructed a machine with a non-empty initial state")
 	}
 
 	if m.current != emptyState {
-		t.Error("NewMachine constructed a machine with a non-empty current state")
+		t.Error("NewMooreMachine constructed a machine with a non-empty current state")
 	}
 
 	if len(m.states) != 0 {
-		t.Error("NewMachine constructed a machine with states")
+		t.Error("NewMooreMachine constructed a machine with states")
 	}
 
 	if len(m.events) != 0 {
-		t.Error("NewMachine constructed a machine with initial events")
+		t.Error("NewMooreMachine constructed a machine with initial events")
 	}
 }
 
-func TestMooreMachine_AddState(t *testing.T) {
+func TestNewMooreMachine_AddState(t *testing.T) {
 	// Adding a state to a started machine should fail.
-	m := NewMachine()
+	m := NewMooreMachine()
 	m.Start()
 	err := m.AddState("s1", 1)
 
@@ -35,7 +35,7 @@ func TestMooreMachine_AddState(t *testing.T) {
 	}
 
 	// Adding a duplicate state should fail.
-	m = NewMachine()
+	m = NewMooreMachine()
 	err = m.AddState("s0", 0)
 	err = m.AddState("s0", 0)
 
@@ -44,7 +44,7 @@ func TestMooreMachine_AddState(t *testing.T) {
 	}
 
 	// Nameless states cannot be added to a machine.
-	m = NewMachine()
+	m = NewMooreMachine()
 	err = m.AddState("", 0)
 
 	if err == nil {
@@ -52,7 +52,7 @@ func TestMooreMachine_AddState(t *testing.T) {
 	}
 
 	// The first state added to a machine should be set as its initial state.
-	m = NewMachine()
+	m = NewMooreMachine()
 	m.AddState("s0", 0)
 
 	if m.initial == nil || m.initial.name != "s0" {
@@ -60,8 +60,8 @@ func TestMooreMachine_AddState(t *testing.T) {
 	}
 }
 
-func TestMooreMachine_AddTransition(t *testing.T) {
-	m := NewMachine()
+func TestNewMooreMachine_AddTransition(t *testing.T) {
+	m := NewMooreMachine()
 	m.AddState("s0", 0)
 	m.AddState("s1", 1)
 	m.Start()
@@ -74,7 +74,7 @@ func TestMooreMachine_AddTransition(t *testing.T) {
 	}
 
 	// Transitions involving unknown states cannot be added.
-	m = NewMachine()
+	m = NewMooreMachine()
 	err = m.AddTransition("s0", "s1", "input")
 
 	if err == nil {
@@ -89,7 +89,7 @@ func TestMooreMachine_AddTransition(t *testing.T) {
 	}
 
 	// Duplicate transitions cannot be added.
-	m = NewMachine()
+	m = NewMooreMachine()
 	m.AddState("s0", 0)
 	m.AddState("s1", 1)
 	m.AddTransition("s0", "s1", "input")
@@ -100,8 +100,8 @@ func TestMooreMachine_AddTransition(t *testing.T) {
 	}
 }
 
-func TestMooreMachine_Current(t *testing.T) {
-	m := NewMachine()
+func TestNewMooreMachine_Current(t *testing.T) {
+	m := NewMooreMachine()
 	m.AddState("s0", 0)
 	m.Start()
 
@@ -110,8 +110,8 @@ func TestMooreMachine_Current(t *testing.T) {
 	}
 }
 
-func TestMooreMachine_Start(t *testing.T) {
-	m := NewMachine()
+func TestNewMooreMachine_Start(t *testing.T) {
+	m := NewMooreMachine()
 	err := m.AddState("s0", 0)
 	m.Start()
 
@@ -128,9 +128,9 @@ func TestMooreMachine_Start(t *testing.T) {
 	}
 }
 
-func TestMooreMachine_On(t *testing.T) {
+func TestNewMooreMachine_On(t *testing.T) {
 	// An event cannot be added to a started machine.
-	m := NewMachine()
+	m := NewMooreMachine()
 	m.Start()
 	err := m.On("s0", "s1", func(e *TransitionEvent) {})
 
@@ -139,7 +139,7 @@ func TestMooreMachine_On(t *testing.T) {
 	}
 
 	// Events for unknown states are not permitted.
-	m = NewMachine()
+	m = NewMooreMachine()
 	err = m.On("s0", "s1", func(e *TransitionEvent) {})
 
 	if err == nil {
@@ -155,7 +155,7 @@ func TestMooreMachine_On(t *testing.T) {
 
 	// On should execute the associated callback functions when transitioning
 	// between relevant states.
-	m = NewMachine()
+	m = NewMooreMachine()
 	m.AddState("s0", 0)
 	m.AddState("s1", 1)
 	m.AddState("s2", 2)
@@ -188,8 +188,8 @@ func TestMooreMachine_On(t *testing.T) {
 	}
 }
 
-func TestMooreMachine_Transition(t *testing.T) {
-	m := NewMachine()
+func TestNewMooreMachine_Transition(t *testing.T) {
+	m := NewMooreMachine()
 	m.AddState("s0", 0)
 	m.AddState("s1", 1)
 	m.AddTransition("s0", "s1", "input")

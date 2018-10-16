@@ -65,8 +65,8 @@ func (m *MooreMachine) next(input string) (*mooreState, error) {
 	return next, nil
 }
 
-// NewMachine creates a new Moore machine.
-func NewMachine() *MooreMachine {
+// NewMooreMachine creates a new Moore machine.
+func NewMooreMachine() *MooreMachine {
 	return &MooreMachine{
 		current: emptyState,
 		states:  []*mooreState{},
