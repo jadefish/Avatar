@@ -55,20 +55,23 @@ func (m *MooreMachine) getState(name string) (*mooreState, bool) {
 	return nil, false
 }
 
+func (m *MooreMachine) next(input string) (*mooreState, error) {
+	next, ok := m.current.destinations[input]
+
+	if !ok {
+		return nil, errors.Wrap(errInvalidTransition, "next")
+	}
+
+	return next, nil
+}
+
 // NewMachine creates a new Moore machine.
-func NewMachine(initial string) (*MooreMachine, error) {
-	m := &MooreMachine{
+func NewMachine() *MooreMachine {
+	return &MooreMachine{
 		current: emptyState,
 		states:  []*mooreState{},
 		events:  map[string][]*event{},
 	}
-	err := m.AddState(initial, nil)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return m, nil
 }
 
 // AddState adds a state to the machine.
@@ -142,42 +145,7 @@ func (m *MooreMachine) Start() error {
 	return nil
 }
 
-// On invokes `fn` when the machine makes the provided transition.
-func (m *MooreMachine) On(from, to string, fn TransitionCallbackFunc) error {
-	stateFrom, ok := m.getState(from)
-
-	if !ok {
-		return errors.Wrap(errUnknownState, from)
-	}
-
-	stateTo, ok := m.getState(to)
-
-	if !ok {
-		return errors.Wrap(errUnknownState, to)
-	}
-
-	e := &event{
-		from: stateFrom,
-		to:   stateTo,
-		fn:   fn,
-	}
-
-	m.events[from] = append(m.events[from], e)
-
-	return nil
-
-}
-
-func (m *MooreMachine) next(input string) (*mooreState, error) {
-	next, ok := m.current.destinations[input]
-
-	if !ok {
-		return nil, errors.Wrap(errInvalidTransition, "next")
-	}
-
-	return next, nil
-}
-
+// Output retrieves the current state's output.
 func (m *MooreMachine) Output(input interface{}) interface{} {
 	return m.current.Output(input)
 }
@@ -194,7 +162,53 @@ func (m *MooreMachine) Transition(input string) (interface{}, error) {
 		return nil, errors.Wrap(err, "transition")
 	}
 
+	prev := m.current
 	m.current = dest
 
+	event := &TransitionEvent{
+		Machine: m,
+		Prev:    prev.name,
+		Current: m.current.name,
+	}
+
+	// Execute (from, to) event callbacks:
+	for _, te := range m.events[prev.name] {
+		if te.to.Name() != m.current.name {
+			continue
+		}
+
+		te.callback(event)
+	}
+
 	return m.Output(input), nil
+}
+
+// On invokes `fn` when the machine makes the provided transition.
+func (m *MooreMachine) On(from, to string, callback EventCallback) error {
+	if m.started {
+		return errors.Wrap(errMachineStarted, "on")
+	}
+
+	stateFrom, ok := m.getState(from)
+
+	if !ok {
+		return errors.Wrap(errUnknownState, from)
+	}
+
+	stateTo, ok := m.getState(to)
+
+	if !ok {
+		return errors.Wrap(errUnknownState, to)
+	}
+
+	e := &event{
+		from:     stateFrom,
+		to:       stateTo,
+		callback: callback,
+	}
+
+	m.events[from] = append(m.events[from], e)
+
+	return nil
+
 }
