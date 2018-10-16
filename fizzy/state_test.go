@@ -4,7 +4,7 @@ import (
 	"testing"
 )
 
-func TestNewState(t *testing.T) {
+func TestnewState(t *testing.T) {
 	name := "foo"
 	s, err := newState(name, "output")
 
@@ -23,7 +23,7 @@ func TestNewState(t *testing.T) {
 	}
 }
 
-func TestCanTransitionTo(t *testing.T) {
+func TestMooreState_CanTransitionTo(t *testing.T) {
 	s0, _ := newState("s0", 0)
 	s1, _ := newState("s1", 1)
 	s2, _ := newState("s2", 2)
@@ -46,5 +46,20 @@ func TestCanTransitionTo(t *testing.T) {
 
 	if result {
 		t.Error("canTransitionTo allowed an invalid transition")
+	}
+}
+
+func TestMooreState_Output(t *testing.T) {
+	s0, _ := newState("s0", "output")
+
+	// Output should return the value defined when the state was constructed.
+	if s0.Output(nil) != "output" {
+		t.Error("Output returned an unexpected value")
+	}
+
+	// The output of a Moore machine's state should be determined only by the
+	// machine's current state.
+	if s0.Output("input") != s0.Output(nil) {
+		t.Error("Output of a Moore machine state was affected by input")
 	}
 }
