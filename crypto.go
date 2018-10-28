@@ -10,24 +10,24 @@ type encrypter interface {
 	Encrypt(src []byte) (dest []byte, err error)
 }
 
-// Decrypter can decrypt data.
-type Decrypter interface {
+// decrypter can decrypt data.
+type decrypter interface {
 	Decrypt(src []byte) (dest []byte, err error)
 }
 
-// Cryptographer is capable of encrypting and decrypting data.
-type Cryptographer interface {
-	Encrypter
-	Decrypter
+// cryptographer can encrypt and decrypt data.
+type cryptographer interface {
+	encrypter
+	decrypter
 }
 
 type CryptoService interface {
-	Cryptographer
+	cryptographer
 
-	GetSeed() uint32
+	GetSeed() Seed
 	GetMasks() KeyPair
 	GetKeys() KeyPair
-	VerifyLogin(src, dest []byte) error
+	LoginDecrypt(src []byte) (dest []byte, err error)
 }
 
 type Seed uint32
