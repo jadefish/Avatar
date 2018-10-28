@@ -1,4 +1,4 @@
-package login
+package crypto
 
 import (
 	"bufio"
@@ -65,10 +65,10 @@ func loadClientKeys() error {
 	return e
 }
 
-// getClientKeyPair returns a pair of client keys for the provided version.
+// GetClientKeyPair returns a pair of client keys for the provided version.
 // If no key exists for the provided version, an empty key pair and an
 // "unsupported version" error are returned.
-func getClientKeyPair(v *avatar.ClientVersion) (avatar.KeyPair, error) {
+func GetClientKeyPair(v avatar.ClientVersion) (avatar.KeyPair, error) {
 	b := strings.Builder{}
 	fmt.Fprintf(&b, "%d.%d.%d", v.Major, v.Minor, v.Patch)
 	key := b.String()
