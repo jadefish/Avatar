@@ -1,7 +1,6 @@
 package avatar
 
 import (
-	"io"
 	"net"
 )
 
@@ -10,32 +9,42 @@ type ClientState uint8
 // Client states
 const (
 	StateDisconnected ClientState = iota
-	StateConnecting
+	StateConnected
 	StateAuthenticating
 	StateAuthenticated
 )
 
-type StateMachine interface {
-	GetState() ClientState
-	SetState(state ClientState) error
+// ClientVersion represents a client's self-declared version.
+type ClientVersion struct {
+	Major    uint32
+	Minor    uint32
+	Patch    uint32
+	Revision uint32
 }
 
-type Versionable interface {
-	GetVersion() *ClientVersion
-	SetVersion(version ClientVersion) error
+type hasVersion interface {
+	Version() *ClientVersion
 }
 
-// TODO: break apart
-type Client interface {
-	io.ReadWriteCloser
-	StateMachine
-	Versionable
-	CryptoService
+type hasState interface {
+	State() ClientState
+}
 
-	RejectLogin(reason LoginRejectionReason) error
+type authenticates interface {
+	Authenticate() error
+}
 
+type connects interface {
+	Connect() error
+	Disconnect(reason byte) error
 	IPAddress() net.IP
+}
 
-	NewCrypto(seed uint32, version ClientVersion) error
+type Client interface {
+	hasVersion
+	hasState
+	connects
+	authenticates
+
 	GetCrypto() *CryptoService
 }

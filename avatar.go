@@ -52,14 +52,6 @@ type Server interface {
 	GetClientsByState(state ClientState) ([]*Client, error)
 }
 
-// ClientVersion represents a client's self-declared version.
-type ClientVersion struct {
-	Major    uint32
-	Minor    uint32
-	Patch    uint32
-	Revision uint32
-}
-
 type Account struct {
 	ID             int
 	CreatedAt      time.Time
