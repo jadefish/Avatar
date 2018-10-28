@@ -4,138 +4,281 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/hex"
+	"io"
 	"log"
 	"net"
+	"strings"
 
 	"github.com/jadefish/avatar"
-	"github.com/jadefish/avatar/internal/app/login"
+	"github.com/jadefish/avatar/crypto"
+	"github.com/jadefish/avatar/fizzy"
 	"github.com/pkg/errors"
 )
 
-// Client represents a connected user.
 type Client struct {
-	conn    net.Conn
-	state   avatar.ClientState
-	version avatar.ClientVersion
-	account *avatar.Account
-	crypto  *login.CryptoService
+	conn   net.Conn
+	crypto avatar.CryptoService
+
+	version *avatar.ClientVersion
+	fsm     *fizzy.MooreMachine
+	server  Server
 }
 
-// NewClient creates a new client for the provided connection.
-func NewClient(conn net.Conn) *Client {
-	client := &Client{
-		conn:  conn,
-		state: avatar.StateDisconnected,
-	}
+var long2ipCache = map[avatar.Seed]net.IP{}
 
-	return client
-}
+func NewClient(conn net.Conn, s Server) (*Client, error) {
+	fsm := fizzy.NewMooreMachine()
+	fsm.AddState("disconnected", avatar.StateDisconnected)
+	fsm.AddState("connected", avatar.StateConnected)
+	fsm.AddState("authenticating", avatar.StateAuthenticating)
+	fsm.AddState("authenticated", avatar.StateAuthenticated)
 
-// Read from the client.
-func (c *Client) Read(buf []byte) (int, error) {
-	n, err := c.conn.Read(buf)
+	fsm.AddTransition("disconnected", "disconnected", "disconnect")
+	fsm.AddTransition("disconnected", "connected", "connect")
+
+	fsm.AddTransition("connected", "disconnected", "disconnect")
+	fsm.AddTransition("connected", "authenticating", "authenticate")
+
+	fsm.AddTransition("authenticating", "disconnected", "disconnect")
+	fsm.AddTransition("authenticating", "authenticated", "authenticate")
+
+	fsm.AddTransition("authenticated", "disconnected", "disconnect")
+
+	err := fsm.Start()
 
 	if err != nil {
-		return n, err
+		return nil, errors.Wrap(err, "new client")
 	}
 
-	if n < 1 || n > avatar.BufferSize {
-		return n, errors.New("bad packet length")
-	}
-
-	ip := c.IPAddress()
-
-	log.Printf(
-		"(%s) Read %d/%d bytes:\n%s\n",
-		ip,
-		n,
-		cap(buf),
-		hex.Dump(bytes.Trim(buf, "\000")))
-
-	return n, nil
+	return &Client{
+		conn:   conn,
+		fsm:    fsm,
+		server: s,
+	}, nil
 }
 
-// Write to the client.
-func (c *Client) Write(buf []byte) (int, error) {
-	return c.conn.Write(buf)
-}
+func (c Client) Process(server Server) error {
+	err := c.Connect()
 
-// Close the client's connection.
-func (c *Client) Close() error {
-	err := c.conn.Close()
-
-	if err == nil {
-		c.SetState(avatar.StateDisconnected)
+	if err != nil {
+		return errors.Wrap(err, "process")
 	}
 
-	return errors.Wrap(err, "close")
-}
+	err = c.Authenticate()
 
-// RejectLogin terminates the client's current authentication attempt.
-func (c *Client) RejectLogin(reason avatar.LoginRejectionReason) error {
-	// It is invalid to reject a login process for a client that has already
-	// logged in.
-	if c.GetState() > avatar.StateAuthenticating {
-		return errors.Wrap(avatar.ErrInvalidClientState, "cannot reject login")
+	if err != nil {
+		return errors.Wrap(err, "process")
 	}
 
-	_, err := c.conn.Write([]byte{0x82, byte(reason)})
-
-	if err == nil {
-		c.SetState(avatar.StateDisconnected)
-	}
-
-	return errors.Wrap(err, "disconnect")
+	return err
 }
 
-// GetVersion retrieve's the client's self-reported version.
-func (c *Client) GetVersion() avatar.ClientVersion {
+func (c Client) Version() *avatar.ClientVersion {
 	return c.version
 }
 
-// GetState retireves the current state of the client.
-func (c *Client) GetState() avatar.ClientState {
-	return c.state
+func (c Client) State() avatar.ClientState {
+	return c.fsm.Output(nil).(avatar.ClientState)
 }
 
-// SetState transitions the client into a new state.
-func (c *Client) SetState(state avatar.ClientState) error {
-	// TODO: validate transition
-	c.state = state
+func (c *Client) Connect() error {
+	buf, n, err := c.getFirstPayload()
 
-	return nil
-}
-
-// IPAddress returns the IP address of the client.
-func (c *Client) IPAddress() string {
-	ip := "unknown"
-
-	if seed := c.crypto.GetSeed(); seed > 0 {
-		ip = long2ip(seed).String()
+	if err != nil {
+		return errors.Wrap(err, "connect")
 	}
 
-	return ip
+	if buf[0] != 0xEF || n != 21 {
+		return errors.New("bad packet")
+	}
+
+	// disconnected -> connected
+	_, err = c.fsm.Transition("connect")
+
+	if err != nil {
+		return errors.Wrap(err, "connect")
+	}
+
+	seed := avatar.Seed(binary.BigEndian.Uint32(buf[1:5]))
+	c.version = &avatar.ClientVersion{
+		Major:    binary.BigEndian.Uint32(buf[5:9]),
+		Minor:    binary.BigEndian.Uint32(buf[9:13]),
+		Patch:    binary.BigEndian.Uint32(buf[13:17]),
+		Revision: binary.BigEndian.Uint32(buf[17:21]),
+	}
+
+	ccrs, err := crypto.NewClassicCryptoService(seed, *c.version)
+
+	if err != nil {
+		return errors.Wrap(err, "new crypto")
+	}
+
+	c.crypto = ccrs
+
+	return err
 }
 
-func (c *Client) NewCrypto(seed uint32, version *avatar.ClientVersion) error {
-	crypto, err := login.NewCrypto(seed, version)
+func (c Client) Disconnect(reason byte) error {
+	_, err := c.conn.Write([]byte{0x52, 0x00})
+
+	if err != nil {
+		return errors.Wrap(err, "disconnect")
+	}
+
+	c.fsm.Transition("disconnect")
+
+	// Server must wait for EOF before the open connection can be closed.
+
+	return err
+}
+
+func (c Client) IPAddress() net.IP {
+	if c.crypto == nil {
+		// Fallback to conn's remote IP:
+		return net.ParseIP(c.conn.RemoteAddr().String())
+	}
+
+	seed := c.crypto.GetSeed()
+
+	if _, ok := long2ipCache[seed]; !ok {
+		long2ipCache[seed] = seed.ToIPv4()
+	}
+
+	return long2ipCache[seed]
+}
+
+func (c Client) Authenticate() error {
+	buf, n, err := c.read()
+
+	if err != nil || n < 62 {
+		return errors.Wrap(err, "authenticate")
+	}
+
+	// connected -> authenticating
+	c.fsm.Transition("authenticate")
+
+	dest, err := c.crypto.LoginDecrypt(buf)
+
+	if err != nil {
+		return errors.Wrap(err, "login decrypt")
+	}
+
+	// Validate dest, ensuring the decrypted next command is a login request
+	// and the provided account name and password are NUL-terminated:
+	if !(dest[0] == 0x80 && dest[30] == 0x00 && dest[60] == 0x00) {
+		return errors.New("unable to decrypt")
+	}
+
+	log.Printf("crypto payload:\n%s\n", hex.Dump(dest))
+
+	// Find account:
+	name := strings.Trim(string(dest[1:31]), "\000")
+	pw := bytes.Trim(dest[31:61], "\000")
+	account, err := c.server.Accounts.GetAccountByName(name)
 
 	if err != nil {
 		return err
 	}
 
-	c.crypto = crypto
+	log.Println("found account:", account)
 
-	return err
+	// Authenticate:
+	if !c.server.Passwords.ComparePasswords(pw, []byte(account.Password)) {
+		return avatar.ErrInvalidCredentials
+	}
+
+	// authenticating -> authenticated
+	c.fsm.Transition("authenticate")
+
+	return nil
 }
 
-func (c *Client) GetCrypto() avatar.CryptoService {
-	return c.crypto
+func (c Client) GetCrypto() *avatar.CryptoService {
+	return &c.crypto
 }
 
-func long2ip(long uint32) net.IP {
-	b := make([]byte, 4)
-	binary.BigEndian.PutUint32(b[:], long)
+func (c Client) read() ([]byte, int, error) {
+	return c.readAtMost(avatar.BufferSize)
+}
 
-	return net.IP(b)
+func (c Client) readAtMost(size int) ([]byte, int, error) {
+	buf := make([]byte, size)
+	n, err := c.conn.Read(buf)
+
+	if err == io.EOF {
+		// TODO: determine the correct reason value for an EOF disconnect
+		return buf, n, c.Disconnect(0x00)
+	}
+
+	if err != nil {
+		return buf, n, errors.Wrap(err, "read")
+	}
+
+	if n < 1 || n > size {
+		return buf, n, errors.New("bad packet length")
+	}
+
+	log.Printf(
+		"(%s) Read %d/%d bytes:\n%s\n",
+		c.IPAddress().String(),
+		n,
+		cap(buf),
+		hex.Dump(bytes.Trim(buf, "\000")),
+	)
+
+	return buf[:n], n, nil
+}
+
+// Retrieve the first required 21 bytes of data.
+// Clients seem to occasionally send 1 byte (command), 5 bytes (command +
+// seed), or all 21 bytes on first read.
+func (c Client) getFirstPayload() ([]byte, int, error) {
+	buf, n, err := c.readAtMost(21)
+
+	if err != nil {
+		return buf, n, errors.Wrap(err, "get connect payload")
+	}
+
+	if n == 21 {
+		// All good.
+		return buf, n, err
+	}
+
+	n2 := 21 - n
+	cn := 1
+	max := 21 // break after 21 reads of a single byte
+
+	for {
+		if n == 21 || cn >= max {
+			break
+		}
+
+		buf2, n2, err2 := c.readAtMost(n2)
+
+		if err != nil {
+			return []byte{}, n2, err2
+		}
+
+		buf = append(buf[:n], buf2...)
+		n += n2
+
+		cn++
+	}
+
+	return buf, n, err
+
+	// buf2, n2, err := c.readAtMost(21 - n1)
+	//
+	// if err != nil {
+	// 	return buf, n2, errors.Wrap(err, "get connect payload")
+	// }
+	//
+	// n := n1 + n2
+	// buf = append(buf[:n1], buf2...)
+	//
+	// if n < 21 {
+	// 	return buf, n, errors.New("bad first payload")
+	// }
+	//
+	// return buf, n, err
 }

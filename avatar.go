@@ -47,8 +47,8 @@ var (
 const BufferSize = 0xF000
 
 type Server interface {
-	AddClient(client Client) error
-	FindClient(seed uint32) (*Client, error)
+	addClient(client Client) error
+	FindClient(seed uint32) *Client
 	GetClientsByState(state ClientState) ([]*Client, error)
 }
 
