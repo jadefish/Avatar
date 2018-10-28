@@ -8,8 +8,7 @@ import (
 
 // AccountService facilitates interacting with user accounts.
 type AccountService struct {
-	DB        *sqlx.DB
-	Passwords avatar.PasswordService
+	DB *sqlx.DB
 }
 
 // GetAccountByID retrieves an account by its ID.
