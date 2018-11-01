@@ -8,7 +8,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-// TODO: load me from configuration:
+// TODO: load me from separate configuration:
 const (
 	clientSliceSize = 256
 	defaultHost     = "0.0.0.0"
@@ -64,6 +64,8 @@ func (s *Server) Accept() (*Client, error) {
 		return nil, errors.Wrap(err, "accept")
 	}
 
+	// TODO: only create a new Client if we're able to read a valid first
+	// payload (0xEF, seed, and version) successfully
 	client, err := NewClient(conn, *s)
 
 	if err != nil {

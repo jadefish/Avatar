@@ -26,6 +26,9 @@ type Client struct {
 
 var long2ipCache = map[avatar.Seed]net.IP{}
 
+// NewClient sets up a new client.
+// After initialization, the client is not yet capable of executing
+// cryptographic functions.
 func NewClient(conn net.Conn, s Server) (*Client, error) {
 	fsm := fizzy.NewMooreMachine()
 	fsm.AddState("disconnected", avatar.StateDisconnected)
@@ -119,7 +122,7 @@ func (c *Client) Connect() error {
 }
 
 func (c Client) Disconnect(reason byte) error {
-	_, err := c.conn.Write([]byte{0x52, 0x00})
+	_, err := c.conn.Write([]byte{0x52, reason})
 
 	if err != nil {
 		return errors.Wrap(err, "disconnect")
@@ -266,19 +269,4 @@ func (c Client) getFirstPayload() ([]byte, int, error) {
 	}
 
 	return buf, n, err
-
-	// buf2, n2, err := c.readAtMost(21 - n1)
-	//
-	// if err != nil {
-	// 	return buf, n2, errors.Wrap(err, "get connect payload")
-	// }
-	//
-	// n := n1 + n2
-	// buf = append(buf[:n1], buf2...)
-	//
-	// if n < 21 {
-	// 	return buf, n, errors.New("bad first payload")
-	// }
-	//
-	// return buf, n, err
 }

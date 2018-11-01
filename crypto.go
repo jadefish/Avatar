@@ -30,14 +30,16 @@ type CryptoService interface {
 	LoginDecrypt(src []byte) (dest []byte, err error)
 }
 
+// Seed is a client encryption seed.
+// It is typically the IPv4 address of the client.
 type Seed uint32
 
 // ToIPv4 encodes the seed as an IPv4 address.
 func (s Seed) ToIPv4() net.IP {
-	b := make([]byte, net.IPv4len)
+	var b [net.IPv4len]byte
 	binary.BigEndian.PutUint32(b[:], uint32(s))
 
-	return net.IP(b)
+	return net.IP(b[:])
 }
 
 type KeyPair struct {
