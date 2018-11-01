@@ -4,7 +4,7 @@ import (
 	"testing"
 )
 
-func TestnewState(t *testing.T) {
+func Test_newState(t *testing.T) {
 	name := "foo"
 	s, err := newState(name, "output")
 
