@@ -24,6 +24,11 @@ type Client struct {
 	server  Server
 }
 
+type authResult struct {
+	AccountName string
+	Password    []byte
+}
+
 var long2ipCache = map[avatar.Seed]net.IP{}
 
 // NewClient sets up a new client.
@@ -58,22 +63,6 @@ func NewClient(conn net.Conn, s Server) (*Client, error) {
 		fsm:    fsm,
 		server: s,
 	}, nil
-}
-
-func (c Client) Process(server Server) error {
-	err := c.Connect()
-
-	if err != nil {
-		return errors.Wrap(err, "process")
-	}
-
-	err = c.Authenticate()
-
-	if err != nil {
-		return errors.Wrap(err, "process")
-	}
-
-	return err
 }
 
 func (c Client) Version() *avatar.ClientVersion {
@@ -150,11 +139,12 @@ func (c Client) IPAddress() net.IP {
 	return long2ipCache[seed]
 }
 
-func (c Client) Authenticate() error {
+func (c Client) Authenticate() (*authResult, error) {
 	buf, n, err := c.read()
+	result := &authResult{}
 
 	if err != nil || n < 62 {
-		return errors.Wrap(err, "authenticate")
+		return nil, errors.Wrap(err, "authenticate")
 	}
 
 	// connected -> authenticating
@@ -163,37 +153,30 @@ func (c Client) Authenticate() error {
 	dest, err := c.crypto.LoginDecrypt(buf)
 
 	if err != nil {
-		return errors.Wrap(err, "login decrypt")
+		return nil, errors.Wrap(err, "login decrypt")
 	}
 
 	// Validate dest, ensuring the decrypted next command is a login request
 	// and the provided account name and password are NUL-terminated:
 	if !(dest[0] == 0x80 && dest[30] == 0x00 && dest[60] == 0x00) {
-		return errors.New("unable to decrypt")
+		return nil, errors.New("unable to decrypt")
 	}
 
-	log.Printf("crypto payload:\n%s\n", hex.Dump(dest))
+	result.AccountName = strings.Trim(string(dest[1:31]), "\000")
+	result.Password = bytes.Trim(dest[31:61], "\000")
 
-	// Find account:
-	name := strings.Trim(string(dest[1:31]), "\000")
-	pw := bytes.Trim(dest[31:61], "\000")
-	account, err := c.server.Accounts.GetAccountByName(name)
-
-	if err != nil {
-		return err
+	if len(result.AccountName) < 1 {
+		return nil, errors.New("empty account name")
 	}
 
-	log.Println("found account:", account)
-
-	// Authenticate:
-	if !c.server.Passwords.ComparePasswords(pw, []byte(account.Password)) {
-		return avatar.ErrInvalidCredentials
+	if len(result.Password) < 1 {
+		return nil, errors.New("empty password")
 	}
 
 	// authenticating -> authenticated
 	c.fsm.Transition("authenticate")
 
-	return nil
+	return result, nil
 }
 
 func (c Client) GetCrypto() *avatar.CryptoService {

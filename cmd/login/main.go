@@ -6,7 +6,6 @@ import (
 	"github.com/jadefish/avatar/crypto/bcrypt"
 	"github.com/jadefish/avatar/mysql"
 	"github.com/jadefish/avatar/net"
-	"github.com/pkg/errors"
 )
 
 func main() {
@@ -27,20 +26,12 @@ func main() {
 		log.Fatalln(err)
 	}
 
-	defer server.Stop()
+	server := net.NewServer(as, pws)
+	err = server.Start()
 
-	log.Println("Listening on", server.Address())
-
-	for {
-		client, err := server.Accept()
-
-		if err != nil {
-			err = errors.Wrap(err, "server accept")
-			log.Println(err)
-
-			continue
-		}
-
-		go client.Process(*server)
+	if err != nil {
+		log.Fatalln(err)
 	}
+
+	defer server.Stop()
 }
