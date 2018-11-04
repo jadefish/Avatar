@@ -19,9 +19,8 @@ func (ps *PasswordService) CreatePassword(password []byte) ([]byte, error) {
 	return p, nil
 }
 
-// ComparePasswords compares the provided password and hash, returning `true`
-// if the password matches the hash.
-func (ps *PasswordService) ComparePasswords(password, hash []byte) bool {
+// VerifyPassword compares the provided plaintext password and bcrypt hash.
+func (passwordService) VerifyPassword(password, hash []byte) bool {
 	err := bcrypt.CompareHashAndPassword(hash, password)
 
 	return err == nil
