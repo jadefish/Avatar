@@ -8,6 +8,7 @@ import (
 
 var conf *mysql.Config
 
+// TODO: load from separate configuration and remove init()
 func init() {
 	conf = mysql.NewConfig()
 	conf.User = "root"

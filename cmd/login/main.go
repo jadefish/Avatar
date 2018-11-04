@@ -16,12 +16,12 @@ func main() {
 		log.Fatalln(err)
 	}
 
-	server := net.NewServer()
-	server.Accounts = &mysql.AccountService{
+	as := &mysql.AccountService{
 		DB: db,
 	}
-	server.Passwords = &bcrypt.PasswordService{}
-	err = server.Start()
+
+	// TODO: move cost to separate configuration:
+	pws, err := bcrypt.NewPasswordService(bcrypt.DefaultCost)
 
 	if err != nil {
 		log.Fatalln(err)
