@@ -46,12 +46,6 @@ var (
 // in bytes
 const BufferSize = 0xF000
 
-type Server interface {
-	addClient(client Client) error
-	FindClient(seed uint32) *Client
-	GetClientsByState(state ClientState) ([]*Client, error)
-}
-
 type Account struct {
 	ID             int
 	CreatedAt      time.Time
