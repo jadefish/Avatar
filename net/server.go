@@ -59,8 +59,7 @@ func (s *Server) Start() error {
 		client, err := s.accept()
 
 		if err != nil {
-			log.Println(errors.Wrap(err, "server accept"))
-			continue
+			return errors.Wrap(err, "server accept")
 		}
 
 		go s.processClient(client, done, errs)
