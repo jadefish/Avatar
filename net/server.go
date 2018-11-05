@@ -29,7 +29,7 @@ type Server struct {
 // NewServer creates a new server.
 func NewServer(as avatar.AccountService, ps avatar.PasswordService) *Server {
 	return &Server{
-		clients:   make([]Client, clientSliceSize),
+		clients:   make([]Client, 0, clientSliceSize),
 		accounts:  as,
 		passwords: ps,
 	}
