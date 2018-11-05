@@ -49,8 +49,6 @@ func (s *Server) Start() error {
 
 	log.Println("Listening on", s.Address())
 
-	defer s.Stop()
-
 	done := make(chan bool)
 	errs := make(chan error)
 
