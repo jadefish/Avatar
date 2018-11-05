@@ -21,7 +21,6 @@ type Client struct {
 
 	version *avatar.ClientVersion
 	fsm     *fizzy.MooreMachine
-	server  Server
 }
 
 type authResult struct {
@@ -34,7 +33,7 @@ var long2ipCache = map[avatar.Seed]net.IP{}
 // NewClient sets up a new client.
 // After initialization, the client is not yet capable of executing
 // cryptographic functions.
-func NewClient(conn net.Conn, s Server) (*Client, error) {
+func NewClient(conn net.Conn) (*Client, error) {
 	fsm := fizzy.NewMooreMachine()
 	fsm.AddState("disconnected", avatar.StateDisconnected)
 	fsm.AddState("connected", avatar.StateConnected)
@@ -59,9 +58,8 @@ func NewClient(conn net.Conn, s Server) (*Client, error) {
 	}
 
 	return &Client{
-		conn:   conn,
-		fsm:    fsm,
-		server: s,
+		conn: conn,
+		fsm:  fsm,
 	}, nil
 }
 

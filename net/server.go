@@ -95,7 +95,7 @@ func (s *Server) accept() (*Client, error) {
 		return nil, errors.Wrap(err, "listener accept")
 	}
 
-	client, err := NewClient(conn, *s)
+	client, err := NewClient(conn)
 
 	if err != nil {
 		return nil, errors.Wrap(err, "new client creation")
