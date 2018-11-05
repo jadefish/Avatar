@@ -74,8 +74,19 @@ func (s *Server) Start() error {
 	}
 }
 
-// Stop the server.
+// Stop the server, disconnecting connected clients and preventing new
+// connections from being accepted.
 func (s *Server) Stop() error {
+	for _, c := range s.clients {
+		err := c.Disconnect(0x00) // TODO
+
+		if err != nil {
+			log.Println(errors.Wrap(err, "server stop"))
+		}
+
+		s.removeClient(&c)
+	}
+
 	return s.listener.Close()
 }
 
@@ -135,8 +146,23 @@ func (s Server) processClient(c *Client, done chan<- bool, errs chan<- error) {
 	done <- true
 }
 
-func (s Server) addClient(client Client) {
+// addClient adds the provided client to the server's list of clients.
+func (s *Server) addClient(client Client) {
 	s.clients = append(s.clients, client)
+}
+
+// removeClient removes the provided client from the server's list of
+// clients, returning true if a client was removed.
+// The removed client (if any) is not disconnected.
+func (s *Server) removeClient(client *Client) bool {
+	for i, c := range s.clients {
+		if c == *client {
+			s.clients = append(s.clients[:i], s.clients[i+1:]...)
+			return true
+		}
+	}
+
+	return false
 }
 
 func getAddr() string {
