@@ -4,6 +4,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"time"
 
 	"github.com/jadefish/avatar"
 	"github.com/pkg/errors"
@@ -49,11 +50,7 @@ func (s *Server) Start() error {
 
 	log.Println("Listening on", s.Address())
 
-	done := make(chan bool)
 	errs := make(chan error)
-
-	defer close(done)
-	defer close(errs)
 
 	for {
 		client, err := s.accept()
@@ -62,14 +59,14 @@ func (s *Server) Start() error {
 			return err
 		}
 
-		go s.processClient(client, done, errs)
+		go s.processClient(client, errs)
 
 		select {
-		case <-done:
-			s.addClient(*client)
 		case e := <-errs:
 			log.Println(e)
 			client.Disconnect(0x00) // TODO
+		default:
+			continue
 		}
 	}
 }
@@ -122,7 +119,7 @@ func (s *Server) accept() (*Client, error) {
 	return client, nil
 }
 
-func (s Server) processClient(c *Client, done chan<- bool, errs chan<- error) {
+func (s *Server) processClient(c *Client, errs chan error) {
 	err := c.Connect()
 
 	if err != nil {
@@ -153,12 +150,17 @@ func (s Server) processClient(c *Client, done chan<- bool, errs chan<- error) {
 		return
 	}
 
-	done <- true
+	s.addClient(*c)
 }
 
 // addClient adds the provided client to the server's list of clients.
 func (s *Server) addClient(client Client) {
+	log.Println("add client:", client)
 	s.clients = append(s.clients, client)
+	for {
+		log.Println("blocking tick")
+		time.Sleep(1 * time.Second)
+	}
 }
 
 // removeClient removes the provided client from the server's list of
