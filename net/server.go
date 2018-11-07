@@ -4,7 +4,6 @@ import (
 	"log"
 	"net"
 	"os"
-	"time"
 
 	"github.com/jadefish/avatar"
 	"github.com/pkg/errors"
@@ -155,12 +154,7 @@ func (s *Server) processClient(c *Client, errs chan error) {
 
 // addClient adds the provided client to the server's list of clients.
 func (s *Server) addClient(client Client) {
-	log.Println("add client:", client)
 	s.clients = append(s.clients, client)
-	for {
-		log.Println("blocking tick")
-		time.Sleep(1 * time.Second)
-	}
 }
 
 // removeClient removes the provided client from the server's list of
