@@ -4,5 +4,7 @@ package avatar
 type Server interface {
 	Start() error
 	Stop() error
-	Process(*Client) error
+
+	AccountService() AccountService
+	PasswordService() PasswordService
 }

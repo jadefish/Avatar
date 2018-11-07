@@ -90,6 +90,16 @@ func (s *Server) Stop() error {
 	return s.listener.Close()
 }
 
+// AccountService returns the server's account service.
+func (s Server) AccountService() avatar.AccountService {
+	return s.accounts
+}
+
+// PasswordService returns the server's password service.
+func (s Server) PasswordService() avatar.PasswordService {
+	return s.passwords
+}
+
 // Address retrieves the server's address.
 func (s *Server) Address() string {
 	return s.listener.Addr().String()
@@ -137,7 +147,7 @@ func (s Server) processClient(c *Client, done chan<- bool, errs chan<- error) {
 
 	log.Println("found account:", account)
 
-	// Authenticate:
+	// Verify credentials:
 	if !s.passwords.VerifyPassword(result.Password, []byte(account.Password)) {
 		errs <- errors.Wrap(avatar.ErrInvalidCredentials, "process client")
 		return
