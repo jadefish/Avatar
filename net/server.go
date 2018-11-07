@@ -59,7 +59,7 @@ func (s *Server) Start() error {
 		client, err := s.accept()
 
 		if err != nil {
-			return errors.Wrap(err, "server accept")
+			return err
 		}
 
 		go s.processClient(client, done, errs)
@@ -68,7 +68,7 @@ func (s *Server) Start() error {
 		case <-done:
 			s.addClient(*client)
 		case e := <-errs:
-			log.Println(errors.Wrap(e, "process client"))
+			log.Println(e)
 			client.Disconnect(0x00) // TODO
 		}
 	}
