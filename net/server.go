@@ -156,6 +156,16 @@ func (s *Server) processClient(c *Client, errs chan error) {
 		return
 	}
 
+	shards := []*avatar.Shard{
+		{
+			Name:        "foo 1",
+			PercentFull: 10,
+			TimeZone:    1,
+			IPAddress:   net.IPv4(192, 168, 0, 1),
+		},
+	}
+	err = c.ReceiveShardList(shards)
+
 	s.addClient(*c)
 }
 

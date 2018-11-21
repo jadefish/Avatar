@@ -186,12 +186,58 @@ func (c Client) LogIn() error {
 	return nil
 }
 
+func (c Client) ReceiveShardList(shards []*avatar.Shard) error {
+	n := len(shards)
+	length := 6 + n*40
+
+	buf := make([]byte, 0, length)
+	buf = append(buf, 0xA8)
+	buf = append(buf, []byte{0x00, byte(length)}...)
+	buf = append(buf, 0xFF)
+	buf = append(buf, []byte{0x00, byte(n)}...)
+
+	for i, shard := range shards {
+		index := i + 1
+		buf = append(buf, []byte{0x00, byte(index)}...)
+
+		// server name:
+		nb := make([]byte, 32)
+		copy(nb[:], []byte(shard.Name))
+		buf = append(buf, nb[0:32]...)
+
+		buf = append(buf, byte(shard.PercentFull))
+		buf = append(buf, byte(shard.TimeZone))
+		buf = append(buf, net.IP.To4(shard.IPAddress)...)
+	}
+
+	c.Write(buf)
+
+	return nil
+}
+
 func (c Client) GetCrypto() *avatar.CryptoService {
 	return &c.crypto
 }
 
 func (c Client) read() ([]byte, int, error) {
 	return c.readAtMost(avatar.BufferSize)
+}
+
+func (c Client) Write(buf []byte) error {
+	n, err := c.conn.Write(buf)
+
+	if err != nil {
+		return errors.Wrap(err, "client write")
+	}
+
+	log.Printf(
+		"(%s) Wrote %d bytes:\n%s\n",
+		c.IPAddress().String(),
+		n,
+		hex.Dump(bytes.Trim(buf, "\000")),
+	)
+
+	return err
 }
 
 func (c Client) readAtMost(size int) ([]byte, int, error) {

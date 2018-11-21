@@ -74,3 +74,11 @@ type PasswordService interface {
 	CreatePassword(password []byte) ([]byte, error)
 	VerifyPassword(password, hash []byte) bool
 }
+
+// Shard contains information about a game server.
+type Shard struct {
+	Name        string
+	PercentFull int
+	TimeZone    int
+	IPAddress   net.IP
+}
