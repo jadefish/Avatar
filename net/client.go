@@ -39,6 +39,7 @@ func NewClient(conn net.Conn) (*Client, error) {
 	fsm.AddState("connected", avatar.StateConnected)
 	fsm.AddState("authenticating", avatar.StateAuthenticating)
 	fsm.AddState("authenticated", avatar.StateAuthenticated)
+	fsm.AddState("logged in", avatar.StateLoggedIn)
 
 	fsm.AddTransition("disconnected", "disconnected", "disconnect")
 	fsm.AddTransition("disconnected", "connected", "connect")
@@ -50,6 +51,7 @@ func NewClient(conn net.Conn) (*Client, error) {
 	fsm.AddTransition("authenticating", "authenticated", "authenticate")
 
 	fsm.AddTransition("authenticated", "disconnected", "disconnect")
+	fsm.AddTransition("authenticated", "logged in", "log in")
 
 	err := fsm.Start()
 
@@ -175,6 +177,13 @@ func (c Client) Authenticate() (*authResult, error) {
 	c.fsm.Transition("authenticate")
 
 	return result, nil
+}
+
+func (c Client) LogIn() error {
+	// authenticated -> logged in
+	c.fsm.Transition("log in")
+
+	return nil
 }
 
 func (c Client) GetCrypto() *avatar.CryptoService {

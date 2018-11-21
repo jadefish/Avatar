@@ -149,6 +149,13 @@ func (s *Server) processClient(c *Client, errs chan error) {
 		return
 	}
 
+	err = c.LogIn()
+
+	if err != nil {
+		errs <- errors.Wrap(err, "process client")
+		return
+	}
+
 	s.addClient(*c)
 }
 

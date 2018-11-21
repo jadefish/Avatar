@@ -12,6 +12,7 @@ const (
 	StateConnected
 	StateAuthenticating
 	StateAuthenticated
+	StateLoggedIn
 )
 
 // ClientVersion represents a client's self-declared version.
