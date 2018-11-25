@@ -4,9 +4,9 @@ import (
 	"github.com/pkg/errors"
 )
 
-// FiniteStateMachine is an abstract model of computation capable of
+// finiteStateMachine is an abstract model of computation capable of
 // transitioning between states in response to input.
-type FiniteStateMachine interface {
+type finiteStateMachine interface {
 	transition(to string) error
 
 	AddState(name string, output interface{}) error
@@ -16,16 +16,19 @@ type FiniteStateMachine interface {
 	Start() error
 }
 
+type eventMap map[string][]*event
+
 // MooreMachine is a finite-state machine whose output is determined only by
 // its current state.
 type MooreMachine struct {
-	FiniteStateMachine
+	finiteStateMachine
 
-	started bool
-	current *mooreState
-	initial *mooreState
-	states  []*mooreState
-	events  map[string][]*event
+	started      bool
+	current      *state
+	initial      *state
+	states       []*state
+	beforeEvents eventMap
+	afterEvents  eventMap
 }
 
 var _ = &MooreMachine{}
@@ -45,7 +48,7 @@ func (m *MooreMachine) hasState(name string) bool {
 	return ok
 }
 
-func (m *MooreMachine) getState(name string) (*mooreState, bool) {
+func (m *MooreMachine) getState(name string) (*state, bool) {
 	for _, state := range m.states {
 		if state.name == name {
 			return state, true
@@ -55,7 +58,7 @@ func (m *MooreMachine) getState(name string) (*mooreState, bool) {
 	return nil, false
 }
 
-func (m *MooreMachine) next(input string) (*mooreState, error) {
+func (m *MooreMachine) next(input string) (*state, error) {
 	next, ok := m.current.destinations[input]
 
 	if !ok {
@@ -65,13 +68,25 @@ func (m *MooreMachine) next(input string) (*mooreState, error) {
 	return next, nil
 }
 
-// NewMooreMachine creates a new Moore machine.
-func NewMooreMachine() *MooreMachine {
+// NewMachine creates a new Moore machine.
+func NewMachine() *MooreMachine {
 	return &MooreMachine{
-		current: emptyState,
-		states:  []*mooreState{},
-		events:  map[string][]*event{},
+		current:      emptyState,
+		beforeEvents: make(eventMap),
+		afterEvents:  make(eventMap),
 	}
+}
+
+func (m *MooreMachine) AddStates(states []State) error {
+	for _, state := range states {
+		err := m.AddState(state.Name, state.Output)
+
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // AddState adds a state to the machine.
@@ -127,6 +142,18 @@ func (m *MooreMachine) AddTransition(from, to, input string) error {
 	return nil
 }
 
+func (m *MooreMachine) AddTransitions(transitions TransitionList) error {
+	for _, t := range transitions {
+		err := m.AddTransition(t.From, t.To, t.Input)
+
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // Current retrieves the machine's current state.
 func (m *MooreMachine) Current() string {
 	return m.current.name
@@ -145,12 +172,12 @@ func (m *MooreMachine) Start() error {
 	return nil
 }
 
-// Output retrieves the current state's output.
+// Output retrieves the machine's output.
 func (m *MooreMachine) Output(input interface{}) interface{} {
-	return m.current.Output(input)
+	return m.current.output
 }
 
-// Transition the machine from its current state to a new state.
+// Transition the machine from its current state a next state.
 func (m *MooreMachine) Transition(input string) (interface{}, error) {
 	if !m.started {
 		return nil, errors.Wrap(errNotStarted, "transition")
@@ -162,29 +189,75 @@ func (m *MooreMachine) Transition(input string) (interface{}, error) {
 		return nil, errors.Wrap(err, "transition")
 	}
 
-	prev := m.current
-	m.current = dest
-
-	event := &TransitionEvent{
+	e := &transitionEvent{
 		Machine: m,
-		Prev:    prev.name,
+		Prev:    "",
 		Current: m.current.name,
+		Next:    dest.name,
 	}
 
-	// Execute (from, to) event callbacks:
-	for _, te := range m.events[prev.name] {
-		if te.to.Name() != m.current.name {
+	// Execute 'before' event callbacks:
+	for _, event := range m.beforeEvents[m.current.name] {
+		if event.to.Name() != dest.Name() {
 			continue
 		}
 
-		te.callback(event)
+		event.callback(e)
+	}
+
+	// Transition the machine:
+	prev := m.current
+	m.current = dest
+
+	e = &transitionEvent{
+		Machine: m,
+		Prev:    prev.name,
+		Current: m.current.name,
+		Next:    "",
+	}
+
+	// Execute 'after' event callbacks:
+	for _, event := range m.afterEvents[prev.name] {
+		if event.to.Name() != m.current.name {
+			continue
+		}
+
+		event.callback(e)
 	}
 
 	return m.Output(input), nil
 }
 
-// On invokes `fn` when the machine makes the provided transition.
-func (m *MooreMachine) On(from, to string, callback eventCallback) error {
+// Before invokes `fn` before the machine makes the providied transition
+func (m *MooreMachine) Before(from, to string, callback callback) error {
+	if m.started {
+		return errors.Wrap(errMachineStarted, "before")
+	}
+
+	stateFrom, ok := m.getState(from)
+
+	if !ok {
+		return errors.Wrap(errUnknownState, from)
+	}
+
+	stateTo, ok := m.getState(to)
+
+	if !ok {
+		return errors.Wrap(errUnknownState, to)
+	}
+
+	e := &event{
+		from:     stateFrom,
+		to:       stateTo,
+		callback: callback,
+	}
+
+	m.beforeEvents[from] = append(m.beforeEvents[from], e)
+
+	return nil
+}
+
+func (m *MooreMachine) After(from, to string, callback callback) error {
 	if m.started {
 		return errors.Wrap(errMachineStarted, "on")
 	}
@@ -207,8 +280,7 @@ func (m *MooreMachine) On(from, to string, callback eventCallback) error {
 		callback: callback,
 	}
 
-	m.events[from] = append(m.events[from], e)
+	m.afterEvents[from] = append(m.afterEvents[from], e)
 
 	return nil
-
 }

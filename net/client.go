@@ -34,29 +34,41 @@ var long2ipCache = map[avatar.Seed]net.IP{}
 // After initialization, the client is not yet capable of executing
 // cryptographic functions.
 func NewClient(conn net.Conn) (*Client, error) {
-	fsm := fizzy.NewMooreMachine()
-	fsm.AddState("disconnected", avatar.StateDisconnected)
-	fsm.AddState("connected", avatar.StateConnected)
-	fsm.AddState("authenticating", avatar.StateAuthenticating)
-	fsm.AddState("authenticated", avatar.StateAuthenticated)
-	fsm.AddState("logged in", avatar.StateLoggedIn)
-
-	fsm.AddTransition("disconnected", "disconnected", "disconnect")
-	fsm.AddTransition("disconnected", "connected", "connect")
-
-	fsm.AddTransition("connected", "disconnected", "disconnect")
-	fsm.AddTransition("connected", "authenticating", "authenticate")
-
-	fsm.AddTransition("authenticating", "disconnected", "disconnect")
-	fsm.AddTransition("authenticating", "authenticated", "authenticate")
-
-	fsm.AddTransition("authenticated", "disconnected", "disconnect")
-	fsm.AddTransition("authenticated", "logged in", "log in")
-
-	err := fsm.Start()
+	fsm := fizzy.NewMachine()
+	err := fsm.AddStates([]fizzy.State{
+		{"disconnected", avatar.StateDisconnected},
+		{"connected", avatar.StateConnected},
+		{"authenticating", avatar.StateAuthenticating},
+		{"authenticated", avatar.StateAuthenticated},
+		{"logged in", avatar.StateLoggedIn},
+	})
 
 	if err != nil {
-		return nil, errors.Wrap(err, "new client")
+		return nil, errors.Wrap(err, "add states")
+	}
+
+	fsm.AddTransitions(fizzy.TransitionList{
+		fizzy.Transition{From: "disconnected", To: "disconnected", Input: "disconnect"},
+		fizzy.Transition{From: "disconnected", To: "connected", Input: "connect"},
+
+		fizzy.Transition{From: "connected", To: "disconnected", Input: "disconnect"},
+		fizzy.Transition{From: "connected", To: "authenticating", Input: "authenticate"},
+
+		fizzy.Transition{From: "authenticating", To: "disconnected", Input: "disconnect"},
+		fizzy.Transition{From: "authenticating", To: "authenticated", Input: "authenticate"},
+
+		fizzy.Transition{From: "authenticated", To: "disconnected", Input: "disconnect"},
+		fizzy.Transition{From: "authenticated", To: "logged in", Input: "log in"},
+	})
+
+	if err != nil {
+		return nil, errors.Wrap(err, "add transitions")
+	}
+
+	err = fsm.Start()
+
+	if err != nil {
+		return nil, errors.Wrap(err, "start FSM")
 	}
 
 	return &Client{

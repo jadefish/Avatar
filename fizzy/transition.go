@@ -1,16 +1,16 @@
 package fizzy
 
-// eventCallback is a state transition event callback function.
-type eventCallback func(e *TransitionEvent)
+// callback is a state transition event callback function.
+type callback func(e *transitionEvent)
 
-// TransitionEvent represents an occurrence of a single state transition.
-type TransitionEvent struct {
-	Machine       FiniteStateMachine
-	Prev, Current string
+// transitionEvent represents an occurrence of a single state transition.
+type transitionEvent struct {
+	Machine             finiteStateMachine
+	Prev, Current, Next string
 }
 
 // event is the internal container for managing (transition, callback) pairs.
 type event struct {
-	from, to State
-	callback eventCallback
+	from, to *state
+	callback callback
 }

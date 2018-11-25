@@ -30,19 +30,19 @@ func TestMooreState_CanTransitionTo(t *testing.T) {
 
 	s0.destinations["one"] = s1
 
-	result := s0.CanTransitionTo(s2)
+	result := s0.canTransitionTo(s2)
 
 	if result {
 		t.Error("canTransitionTo allowed an invalid transition")
 	}
 
-	result = s0.CanTransitionTo(s1)
+	result = s0.canTransitionTo(s1)
 
 	if !result {
 		t.Error("canTransitionTo prevented a valid transition")
 	}
 
-	result = s1.CanTransitionTo(s0)
+	result = s1.canTransitionTo(s0)
 
 	if result {
 		t.Error("canTransitionTo allowed an invalid transition")
@@ -53,13 +53,13 @@ func TestMooreState_Output(t *testing.T) {
 	s0, _ := newState("s0", "output")
 
 	// Output should return the value defined when the state was constructed.
-	if s0.Output(nil) != "output" {
+	if s0.Output() != "output" {
 		t.Error("Output returned an unexpected value")
 	}
 
 	// The output of a Moore machine's state should be determined only by the
 	// machine's current state.
-	if s0.Output("input") != s0.Output(nil) {
+	if s0.Output() != s0.Output() {
 		t.Error("Output of a Moore machine state was affected by input")
 	}
 }

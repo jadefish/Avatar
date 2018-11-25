@@ -4,29 +4,29 @@ import (
 	"testing"
 )
 
-func TestNewMooreMachine(t *testing.T) {
-	m := NewMooreMachine()
+func TestNewMachine(t *testing.T) {
+	m := NewMachine()
 
 	if m.initial != nil {
-		t.Error("NewMooreMachine constructed a machine with a non-empty initial state")
+		t.Error("NewMachine constructed a machine with a non-empty initial state")
 	}
 
 	if m.current != emptyState {
-		t.Error("NewMooreMachine constructed a machine with a non-empty current state")
+		t.Error("NewMachine constructed a machine with a non-empty current state")
 	}
 
 	if len(m.states) != 0 {
-		t.Error("NewMooreMachine constructed a machine with states")
+		t.Error("NewMachine constructed a machine with states")
 	}
 
-	if len(m.events) != 0 {
-		t.Error("NewMooreMachine constructed a machine with initial events")
+	if len(m.beforeEvents)+len(m.afterEvents) > 0 {
+		t.Error("NewMachine constructed a machine with events")
 	}
 }
 
-func TestNewMooreMachine_AddState(t *testing.T) {
+func TestNewMachine_AddState(t *testing.T) {
 	// Adding a state to a started machine should fail.
-	m := NewMooreMachine()
+	m := NewMachine()
 	m.Start()
 	err := m.AddState("s1", 1)
 
@@ -35,7 +35,7 @@ func TestNewMooreMachine_AddState(t *testing.T) {
 	}
 
 	// Adding a duplicate state should fail.
-	m = NewMooreMachine()
+	m = NewMachine()
 	err = m.AddState("s0", 0)
 	err = m.AddState("s0", 0)
 
@@ -44,7 +44,7 @@ func TestNewMooreMachine_AddState(t *testing.T) {
 	}
 
 	// Nameless states cannot be added to a machine.
-	m = NewMooreMachine()
+	m = NewMachine()
 	err = m.AddState("", 0)
 
 	if err == nil {
@@ -52,7 +52,7 @@ func TestNewMooreMachine_AddState(t *testing.T) {
 	}
 
 	// The first state added to a machine should be set as its initial state.
-	m = NewMooreMachine()
+	m = NewMachine()
 	m.AddState("s0", 0)
 
 	if m.initial == nil || m.initial.name != "s0" {
@@ -60,8 +60,23 @@ func TestNewMooreMachine_AddState(t *testing.T) {
 	}
 }
 
-func TestNewMooreMachine_AddTransition(t *testing.T) {
-	m := NewMooreMachine()
+func TestMooreMachine_AddStates(t *testing.T) {
+	m := NewMachine()
+	m.AddStates([]State{
+		{"s0", 0},
+		{"s1", 1},
+		{"s2", 2},
+	})
+
+	// The first state in a provided StateList should be set as the machine's
+	// initial state:
+	if m.initial == nil || m.initial.name != "s0" {
+		t.Error("AddStates processed the state list in an incorrect order")
+	}
+}
+
+func TestNewMachine_AddTransition(t *testing.T) {
+	m := NewMachine()
 	m.AddState("s0", 0)
 	m.AddState("s1", 1)
 	m.Start()
@@ -74,7 +89,7 @@ func TestNewMooreMachine_AddTransition(t *testing.T) {
 	}
 
 	// Transitions involving unknown states cannot be added.
-	m = NewMooreMachine()
+	m = NewMachine()
 	err = m.AddTransition("s0", "s1", "input")
 
 	if err == nil {
@@ -89,7 +104,7 @@ func TestNewMooreMachine_AddTransition(t *testing.T) {
 	}
 
 	// Duplicate transitions cannot be added.
-	m = NewMooreMachine()
+	m = NewMachine()
 	m.AddState("s0", 0)
 	m.AddState("s1", 1)
 	m.AddTransition("s0", "s1", "input")
@@ -100,8 +115,8 @@ func TestNewMooreMachine_AddTransition(t *testing.T) {
 	}
 }
 
-func TestNewMooreMachine_Current(t *testing.T) {
-	m := NewMooreMachine()
+func TestNewMachine_Current(t *testing.T) {
+	m := NewMachine()
 	m.AddState("s0", 0)
 	m.Start()
 
@@ -110,8 +125,8 @@ func TestNewMooreMachine_Current(t *testing.T) {
 	}
 }
 
-func TestNewMooreMachine_Start(t *testing.T) {
-	m := NewMooreMachine()
+func TestNewMachine_Start(t *testing.T) {
+	m := NewMachine()
 	err := m.AddState("s0", 0)
 	m.Start()
 
@@ -128,68 +143,160 @@ func TestNewMooreMachine_Start(t *testing.T) {
 	}
 }
 
-func TestNewMooreMachine_On(t *testing.T) {
+func TestNewMachine_Before(t *testing.T) {
 	// An event cannot be added to a started machine.
-	m := NewMooreMachine()
+	m := NewMachine()
 	m.Start()
-	err := m.On("s0", "s1", func(e *TransitionEvent) {})
+	err := m.Before("s0", "s1", func(e *transitionEvent) {})
 
 	if err == nil {
-		t.Error("On mutated a started machine")
+		t.Error("Before mutated a started machine")
 	}
 
 	// Events for unknown states are not permitted.
-	m = NewMooreMachine()
-	err = m.On("s0", "s1", func(e *TransitionEvent) {})
+	m = NewMachine()
+	err = m.Before("s0", "s1", func(e *transitionEvent) {})
 
 	if err == nil {
-		t.Error("On permitted adding an event from an unknown state")
+		t.Error("Before permitted adding an event from an unknown state")
 	}
 
 	m.AddState("s0", 0)
-	err = m.On("s0", "s1", func(e *TransitionEvent) {})
+	err = m.Before("s0", "s1", func(e *transitionEvent) {})
 
 	if err == nil {
-		t.Error("On permitted adding an event to an unknown state")
+		t.Error("Before permitted adding an event to an unknown state")
 	}
 
-	// On should execute the associated callback functions when transitioning
-	// between relevant states.
-	m = NewMooreMachine()
-	m.AddState("s0", 0)
-	m.AddState("s1", 1)
-	m.AddState("s2", 2)
-	m.AddTransition("s0", "s1", "input")
-	m.AddTransition("s0", "s2", "input")
+	// Before should execute the associated callback functions before
+	// transitioning the machine.
+	m = NewMachine()
+	m.AddStates([]State{
+		{"s0", 0},
+		{"s1", 1},
+		{"s2", 2},
+	})
+	m.AddTransitions(TransitionList{
+		Transition{"s0", "s1", "input"},
+		Transition{"s1", "s2", "input"},
+	})
 
 	executed := make([]int, 3)
 
-	m.On("s0", "s1", func(e *TransitionEvent) {
+	m.Before("s0", "s1", func(e *transitionEvent) {
+		if m.current.name == "s1" {
+			t.Error("Before executed a callback after a transition occurred")
+		}
+
 		executed[0] = 1
 	})
 
-	m.On("s0", "s1", func(e *TransitionEvent) {
+	m.Before("s0", "s1", func(e *transitionEvent) {
+		if m.current.name == "s1" {
+			t.Error("Before executed a callback after a transition occurred")
+		}
+
 		executed[1] = 1
 	})
 
-	m.On("s0", "s2", func(e *TransitionEvent) {
+	m.Before("s1", "s2", func(e *transitionEvent) {
+		if m.current.name == "s1" {
+			t.Error("Before executed a callback after a transition occurred")
+		}
+
 		executed[2] = 1
 	})
 
 	m.Start()
-	m.Transition("input")
+	m.Transition("input") // s0 -> s1
 
 	if executed[0]+executed[1] < 2 {
-		t.Error("On failed to execute one or more event callback functions")
+		t.Error("Before failed to execute one or more event callback functions")
 	}
 
 	if executed[2] != 0 {
-		t.Error("On executed a callback for a transition that did not occur")
+		t.Error("Before executed a callback for a transition that did not occur")
 	}
 }
 
-func TestNewMooreMachine_Transition(t *testing.T) {
-	m := NewMooreMachine()
+func TestNewMachine_After(t *testing.T) {
+	// An event cannot be added to a started machine.
+	m := NewMachine()
+	m.Start()
+	err := m.After("s0", "s1", func(e *transitionEvent) {})
+
+	if err == nil {
+		t.Error("After mutated a started machine")
+	}
+
+	// Events for unknown states are not permitted.
+	m = NewMachine()
+	err = m.After("s0", "s1", func(e *transitionEvent) {})
+
+	if err == nil {
+		t.Error("After permitted adding an event from an unknown state")
+	}
+
+	m.AddState("s0", 0)
+	err = m.After("s0", "s1", func(e *transitionEvent) {})
+
+	if err == nil {
+		t.Error("After permitted adding an event to an unknown state")
+	}
+
+	// After should execute the associated callback functions before
+	// transitioning the machine.
+	m = NewMachine()
+	m.AddStates([]State{
+		{"s0", 0},
+		{"s1", 1},
+		{"s2", 2},
+	})
+	m.AddTransitions(TransitionList{
+		Transition{"s0", "s1", "input"},
+		Transition{"s1", "s2", "input"},
+	})
+
+	executed := make([]int, 3)
+
+	m.After("s0", "s1", func(e *transitionEvent) {
+		if m.current.name == "s0" {
+			t.Error("After executed a callback before a transition occurred")
+		}
+
+		executed[0] = 1
+	})
+
+	m.After("s0", "s1", func(e *transitionEvent) {
+		if m.current.name == "s0" {
+			t.Error("After executed a callback before a transition occurred")
+		}
+
+		executed[1] = 1
+	})
+
+	m.After("s1", "s2", func(e *transitionEvent) {
+		if m.current.name == "s0" {
+			t.Error("After executed a callback before a transition occurred")
+		}
+
+		executed[2] = 1
+	})
+
+	m.Start()
+	m.Transition("input") // s0 -> s1
+
+	if executed[0]+executed[1] < 2 {
+		t.Error("After failed to execute one or more event callback functions")
+	}
+
+	if executed[2] != 0 {
+		t.Error("After executed a callback for a transition that did not occur")
+	}
+}
+
+func TestNewMachine_Transition(t *testing.T) {
+	m := NewMachine()
 	m.AddState("s0", 0)
 	m.AddState("s1", 1)
 	m.AddTransition("s0", "s1", "input")
