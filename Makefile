@@ -2,9 +2,11 @@ PROJECT := avatar
 PKG := github.com/jadefish
 BINARIES := login
 
-# Go and dep:
+# Go and tools:
 GO ?= $(shell command -v go)
 DEP ?= $(shell command -v dep)
+FMT ?= $(GO) fmt
+VET ?= $(GO) vet
 
 # Platform, architecture, and build flags:
 GOOS ?= linux
@@ -28,7 +30,7 @@ build: $(TARGETS)
 default: $(TARGETS)
 
 $(TARGETS): go $(BIN_DIR) $(SRC_FILES) $(VENDOR_DIR) fmt vet
-	$(info $(BLUE)Building$(RESET) $@ $(BLUE)for$(RESET) $(GOOS)/$(GOARCH)...)
+	$(info $(BLUE)Building$(RESET) $@ $(BLUE)for$(RESET) $(GOARCH)/$(GOOS)...)
 	env GOOS=$(GOOS) GOARCH=$(GOARCH) $(GO) build $(GOFLAGS) -o $@ $(PKG)
 
 $(BIN_DIR):
@@ -39,10 +41,10 @@ $(VENDOR_DIR): dep
 	@$(DEP) ensure
 
 fmt:
-	$(GO) fmt ./...
+	$(FMT) ./...
 
 vet:
-	$(GO) vet ./...
+	$(VET) ./...
 
 clean:
 	test -d $(BIN_DIR) && $(RM) -r $(BIN_DIR)
