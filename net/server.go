@@ -14,6 +14,7 @@ const (
 	clientSliceSize = 256
 	defaultHost     = "0.0.0.0"
 	defaultPort     = "7775"
+	processCapacity = 5
 )
 
 // Server is a capable of accepting and processing clients over a network.
@@ -35,6 +36,49 @@ func NewServer(as avatar.AccountService, ps avatar.PasswordService) *Server {
 	}
 }
 
+type Result struct {
+	OK  bool
+	Client *Client
+	Err error
+}
+
+func acceptor(id int, server *Server, jobs chan<- *Client) {
+	log.Printf("Producer %d: waiting for connection\n", id)
+
+	client, err := server.accept()
+	log.Printf("Producer %d: accepted connection %p\n", id, client)
+
+	if err != nil {
+		log.Printf("Producer %d: error: %s", id, err.Error())
+		return
+	}
+
+	log.Printf("Producer %d: sending client %p through jobs channel\n", id, client)
+	jobs <- client
+}
+
+func processor(id int, server *Server, jobs <-chan *Client, results chan<- Result) {
+	log.Printf("Worker %d: waiting for job\n", id)
+
+	for c := range jobs {
+		log.Printf("Worker %d: got job for client %p\n", id, c)
+
+		result := Result{}
+		err := server.processClient(c)
+
+		if err != nil {
+			result.Err = err
+		} else {
+			result.OK = true
+			result.Client = c
+		}
+
+		log.Printf("Worker %d: job's done.\n\tResult: %+v\n", id, result)
+
+		results <- result
+	}
+}
+
 // Start the server, allowing it to accept and process incoming client
 // connections.
 func (s *Server) Start() error {
@@ -49,23 +93,29 @@ func (s *Server) Start() error {
 
 	log.Println("Listening on", s.Address())
 
-	errs := make(chan error)
+	jobs := make(chan *Client, processCapacity)
+	results := make(chan Result, processCapacity)
+
+	// Start client acceptors, which produce client-wrapped connections:
+	for w := 0; w < processCapacity; w++ {
+		go acceptor(w+1, s, jobs)
+	}
+
+	// Start client consumers, which process clients:
+	for w := 0; w < processCapacity; w++ {
+		go processor(w+1, s, jobs, results)
+	}
 
 	for {
-		client, err := s.accept()
-
-		if err != nil {
-			return err
-		}
-
-		go s.processClient(client, errs)
-
 		select {
-		case e := <-errs:
-			log.Println(e)
-			client.Disconnect(0x00) // TODO
-		default:
-			continue
+		case r := <-results:
+			log.Printf("Got result: %+v\n", r)
+
+			if r.OK {
+				s.addClient(*r.Client)
+			} else {
+				r.Client.Disconnect(0x00) // TODO
+			}
 		}
 	}
 }
@@ -73,6 +123,8 @@ func (s *Server) Start() error {
 // Stop the server, disconnecting connected clients and preventing new
 // connections from being accepted.
 func (s *Server) Stop() error {
+	log.Println("Stopping server...")
+
 	for _, c := range s.clients {
 		err := c.Disconnect(0x00) // TODO
 
@@ -118,42 +170,37 @@ func (s *Server) accept() (*Client, error) {
 	return client, nil
 }
 
-func (s *Server) processClient(c *Client, errs chan error) {
+func (s *Server) processClient(c *Client) error {
 	err := c.Connect()
 
 	if err != nil {
-		errs <- errors.Wrap(err, "process client")
-		return
+		return errors.Wrap(err, "process client")
 	}
 
 	result, err := c.Authenticate()
 
 	if err != nil {
-		errs <- errors.Wrap(err, "process client")
-		return
+		return errors.Wrap(err, "process client")
 	}
 
 	// Find account:
 	account, err := s.accounts.GetAccountByName(result.AccountName)
 
 	if err != nil {
-		errs <- errors.Wrap(err, "process client")
-		return
+		return errors.Wrap(err, "process client")
 	}
 
 	log.Println("found account:", account)
 
 	// Verify credentials:
 	if !s.passwords.VerifyPassword(result.Password, []byte(account.Password)) {
-		errs <- errors.Wrap(avatar.ErrInvalidCredentials, "process client")
-		return
+		return errors.Wrap(avatar.ErrInvalidCredentials, "process client")
 	}
 
 	err = c.LogIn()
 
 	if err != nil {
-		errs <- errors.Wrap(err, "process client")
-		return
+		return errors.Wrap(err, "process client")
 	}
 
 	shards := []*avatar.Shard{
@@ -166,7 +213,11 @@ func (s *Server) processClient(c *Client, errs chan error) {
 	}
 	err = c.ReceiveShardList(shards)
 
-	s.addClient(*c)
+	if err != nil {
+		return errors.Wrap(err, "receive shard list")
+	}
+
+	return nil
 }
 
 // addClient adds the provided client to the server's list of clients.
