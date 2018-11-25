@@ -63,6 +63,7 @@ func (a *Account) IsDeleted() bool {
 	return a.DeletedAt != nil
 }
 
+// AccountService provides methods for working with user accounts.
 type AccountService interface {
 	GetAccountByID(id int) (*Account, error)
 	GetAccountByEmail(email string) (*Account, error)

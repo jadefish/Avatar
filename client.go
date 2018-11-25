@@ -41,6 +41,7 @@ type connects interface {
 	IPAddress() net.IP
 }
 
+// Client is a representation of a connected user.
 type Client interface {
 	hasVersion
 	hasState

@@ -21,6 +21,12 @@ type cryptographer interface {
 	decrypter
 }
 
+// KeyPair contains a pair of version-specific client encryption keys.
+type KeyPair struct {
+	Lo, Hi uint32
+}
+
+// CryptoService provides cryptographic services for client data.
 type CryptoService interface {
 	cryptographer
 
@@ -40,8 +46,4 @@ func (s Seed) ToIPv4() net.IP {
 	binary.BigEndian.PutUint32(b[:], uint32(s))
 
 	return net.IP(b[:])
-}
-
-type KeyPair struct {
-	Lo, Hi uint32
 }
