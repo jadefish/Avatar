@@ -3,9 +3,9 @@ package main
 import (
 	"log"
 
-	"github.com/jadefish/avatar/crypto/bcrypt"
-	"github.com/jadefish/avatar/mysql"
-	"github.com/jadefish/avatar/net"
+	"github.com/jadefish/Avatar/crypto/bcrypt"
+	"github.com/jadefish/Avatar/mysql"
+	"github.com/jadefish/Avatar/net"
 )
 
 func main() {

@@ -3,7 +3,7 @@ package mysql
 import (
 	"github.com/jmoiron/sqlx"
 
-	"github.com/jadefish/avatar"
+	"github.com/jadefish/Avatar"
 )
 
 // AccountService facilitates interacting with user accounts.
