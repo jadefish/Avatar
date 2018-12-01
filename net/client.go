@@ -47,18 +47,18 @@ func NewClient(conn net.Conn) (*Client, error) {
 		return nil, errors.Wrap(err, "add states")
 	}
 
-	fsm.AddTransitions(fizzy.TransitionList{
-		fizzy.Transition{From: "disconnected", To: "disconnected", Input: "disconnect"},
-		fizzy.Transition{From: "disconnected", To: "connected", Input: "connect"},
+	fsm.AddTransitions([]fizzy.Transition{
+		{From: "disconnected", To: "disconnected", Input: "disconnect"},
+		{From: "disconnected", To: "connected", Input: "connect"},
 
-		fizzy.Transition{From: "connected", To: "disconnected", Input: "disconnect"},
-		fizzy.Transition{From: "connected", To: "authenticating", Input: "authenticate"},
+		{From: "connected", To: "disconnected", Input: "disconnect"},
+		{From: "connected", To: "authenticating", Input: "authenticate"},
 
-		fizzy.Transition{From: "authenticating", To: "disconnected", Input: "disconnect"},
-		fizzy.Transition{From: "authenticating", To: "authenticated", Input: "authenticate"},
+		{From: "authenticating", To: "disconnected", Input: "disconnect"},
+		{From: "authenticating", To: "authenticated", Input: "authenticate"},
 
-		fizzy.Transition{From: "authenticated", To: "disconnected", Input: "disconnect"},
-		fizzy.Transition{From: "authenticated", To: "logged in", Input: "log in"},
+		{From: "authenticated", To: "disconnected", Input: "disconnect"},
+		{From: "authenticated", To: "logged in", Input: "log in"},
 	})
 
 	if err != nil {
