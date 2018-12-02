@@ -46,11 +46,22 @@ var (
 // in bytes
 const BufferSize = 0xF000
 
+// Record contains common fields for database records.
+type Record struct {
+	ID        int
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	DeletedAt *time.Time
+}
+
+// IsDeleted determines whether the record has been deleted.
+func (r Record) IsDeleted() bool {
+	return r.DeletedAt != nil
+}
+
 type Account struct {
-	ID             int
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
-	DeletedAt      *time.Time
+	Record
+
 	LastLoggedInAt *time.Time
 	Name           string
 	Email          string
