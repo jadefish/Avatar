@@ -198,7 +198,7 @@ func (c Client) LogIn() error {
 	return nil
 }
 
-func (c Client) ReceiveShardList(shards []*avatar.Shard) error {
+func (c Client) ReceiveShardList(shards []avatar.Shard) error {
 	n := len(shards)
 	length := 6 + n*40
 
@@ -217,8 +217,8 @@ func (c Client) ReceiveShardList(shards []*avatar.Shard) error {
 		copy(nb[:], []byte(shard.Name))
 		buf = append(buf, nb[0:32]...)
 
-		buf = append(buf, byte(shard.PercentFull))
-		buf = append(buf, byte(shard.TimeZone))
+		buf = append(buf, byte(shard.PercentFull()))
+		buf = append(buf, byte(1))
 		buf = append(buf, net.IP.To4(shard.IPAddress)...)
 	}
 

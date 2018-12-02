@@ -15,18 +15,17 @@ func main() {
 		log.Fatalln(err)
 	}
 
-	as := &mysql.AccountService{
-		DB: db,
-	}
+	as := &mysql.AccountService{db}
+	ss := &mysql.ShardService{db}
 
 	// TODO: move cost to separate configuration:
-	pws, err := bcrypt.NewPasswordService(bcrypt.DefaultCost)
+	ps, err := bcrypt.NewPasswordService(bcrypt.DefaultCost)
 
 	if err != nil {
 		log.Fatalln(err)
 	}
 
-	server := net.NewServer(as, pws)
+	server := net.NewServer(as, ps, ss)
 	err = server.Start()
 
 	if err != nil {

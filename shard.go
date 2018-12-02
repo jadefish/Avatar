@@ -12,7 +12,7 @@ const ShardNameLength = 32
 
 // ShardService provides methods for retrieving shards.
 type ShardService interface {
-	All() []Shard
+	All() ([]Shard, error)
 	Find(name string) (*Shard, error)
 }
 
@@ -30,7 +30,7 @@ type Shard struct {
 
 // PercentFull returns how full the shard is based on the number of clients
 // in the game world and the shard's capacity.
-func (s Shard) PercentFull() int32 {
+func (s Shard) PercentFull() uint {
 	// TODO: len(clients) / s.Capacity
-	return rand.Int31n(100)
+	return uint(rand.Uint32())
 }

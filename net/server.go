@@ -21,6 +21,7 @@ const (
 type Server struct {
 	accounts  avatar.AccountService
 	passwords avatar.PasswordService
+	shards    avatar.ShardService
 
 	clients  []Client
 	addr     net.Addr
@@ -28,11 +29,16 @@ type Server struct {
 }
 
 // NewServer creates a new server.
-func NewServer(as avatar.AccountService, ps avatar.PasswordService) *Server {
+func NewServer(
+	as avatar.AccountService,
+	ps avatar.PasswordService,
+	ss avatar.ShardService,
+) *Server {
 	return &Server{
 		clients:   make([]Client, 0, clientSliceSize),
 		accounts:  as,
 		passwords: ps,
+		shards:    ss,
 	}
 }
 
@@ -203,14 +209,12 @@ func (s *Server) processClient(c *Client) error {
 		return errors.Wrap(err, "process client")
 	}
 
-	shards := []*avatar.Shard{
-		{
-			Name:        "foo 1",
-			PercentFull: 10,
-			TimeZone:    1,
-			IPAddress:   net.IPv4(192, 168, 0, 1),
-		},
+	shards, err := s.shards.All()
+
+	if err != nil {
+		return errors.Wrap(err, "get shard list")
 	}
+
 	err = c.ReceiveShardList(shards)
 
 	if err != nil {
