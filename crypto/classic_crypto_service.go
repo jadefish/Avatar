@@ -1,8 +1,8 @@
 package crypto
 
 import (
-	"github.com/jadefish/Avatar"
-	"github.com/jadefish/Avatar/internal/crypto"
+	"github.com/jadefish/avatar"
+	"github.com/jadefish/avatar/internal/crypto"
 	"github.com/pkg/errors"
 )
 

@@ -9,7 +9,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/jadefish/Avatar"
+	"github.com/jadefish/avatar"
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v2"
 )

@@ -5,7 +5,7 @@ import (
 	"net"
 	"os"
 
-	"github.com/jadefish/Avatar"
+	"github.com/jadefish/avatar"
 	"github.com/pkg/errors"
 )
 

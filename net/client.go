@@ -9,8 +9,8 @@ import (
 	"net"
 	"strings"
 
-	"github.com/jadefish/Avatar"
-	"github.com/jadefish/Avatar/crypto"
+	"github.com/jadefish/avatar"
+	"github.com/jadefish/avatar/crypto"
 	"github.com/jadefish/fizzy"
 	"github.com/pkg/errors"
 )
