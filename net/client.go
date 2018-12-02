@@ -123,7 +123,7 @@ func (c *Client) Connect() error {
 }
 
 func (c Client) Disconnect(reason byte) error {
-	_, err := c.conn.Write([]byte{0x52, reason})
+	_, err := c.conn.Write([]byte{0x82, reason})
 
 	if err != nil {
 		return errors.Wrap(err, "disconnect")
