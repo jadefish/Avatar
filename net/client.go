@@ -227,10 +227,6 @@ func (c Client) ReceiveShardList(shards []avatar.Shard) error {
 	return nil
 }
 
-func (c Client) GetCrypto() *avatar.CryptoService {
-	return &c.crypto
-}
-
 func (c Client) read() ([]byte, int, error) {
 	return c.readAtMost(avatar.BufferSize)
 }
