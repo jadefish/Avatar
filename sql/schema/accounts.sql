@@ -7,8 +7,8 @@ CREATE TABLE IF NOT EXISTS `accounts` (
     `name` varchar(20) CHARACTER SET ascii NOT NULL COMMENT 'Account name, limited to 20 characters',
     `email` varchar(254) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'Account owner''s registered email address',
     `password` varchar(60) CHARACTER SET ascii NOT NULL COMMENT 'Password hash',
-    `creation_ip` varbinary(16) CHARACTER SET ascii NOT NULL COMMENT 'IP address of record creation',
-    `last_login_ip` varbinary(16) CHARACTER SET ascii DEFAULT NULL COMMENT 'IP address of last successful login',
+    `creation_ip` varbinary(16) NOT NULL COMMENT 'IP address of record creation',
+    `last_login_ip` varbinary(16) DEFAULT NULL COMMENT 'IP address of last successful login',
     PRIMARY KEY (`id`),
     UNIQUE KEY `name` (`name`),
     UNIQUE KEY `email` (`email`)
