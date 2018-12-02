@@ -47,6 +47,4 @@ type Client interface {
 	hasState
 	connects
 	authenticates
-
-	GetCrypto() *CryptoService
 }
