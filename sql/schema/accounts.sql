@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS `accounts` (
     `last_logged_in_at` timestamp NULL DEFAULT NULL COMMENT 'UTC timestamp of last successful login',
     `name` varchar(20) CHARACTER SET ascii NOT NULL COMMENT 'Account name, limited to 20 characters',
     `email` varchar(254) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'Account owner''s registered email address',
-    `password` varchar(60) CHARACTER SET ascii NOT NULL COMMENT 'Password hash',
+    `password_hash` varchar(60) CHARACTER SET ascii NOT NULL COMMENT 'Password hash',
     `creation_ip` varbinary(16) NOT NULL COMMENT 'IP address of record creation',
     `last_login_ip` varbinary(16) DEFAULT NULL COMMENT 'IP address of last successful login',
     PRIMARY KEY (`id`),

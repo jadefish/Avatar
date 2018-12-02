@@ -193,7 +193,7 @@ func (s *Server) processClient(c *Client) error {
 	log.Println("found account:", account)
 
 	// Verify credentials:
-	if !s.passwords.VerifyPassword(result.Password, []byte(account.Password)) {
+	if !s.passwords.VerifyPassword(result.Password, []byte(account.PasswordHash)) {
 		return errors.Wrap(avatar.ErrInvalidCredentials, "process client")
 	}
 

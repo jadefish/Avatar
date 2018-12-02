@@ -65,7 +65,7 @@ type Account struct {
 	LastLoggedInAt *time.Time
 	Name           string
 	Email          string
-	Password       string
+	PasswordHash   string
 	CreationIP     net.IP
 	LastLoginIP    *net.IP
 }
