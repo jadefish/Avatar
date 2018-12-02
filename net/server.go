@@ -43,9 +43,12 @@ func NewServer(
 }
 
 type Result struct {
-	OK  bool
 	Client *Client
-	Err error
+	Err    error
+}
+
+func (r Result) OK() bool {
+	return r.Err == nil
 }
 
 func acceptor(id int, server *Server, jobs chan<- *Client) {
@@ -69,14 +72,13 @@ func processor(id int, server *Server, jobs <-chan *Client, results chan<- Resul
 	for c := range jobs {
 		log.Printf("Worker %d: got job for client %p\n", id, c)
 
-		result := Result{}
+		result := Result{
+			Client: c,
+		}
 		err := server.processClient(c)
 
 		if err != nil {
 			result.Err = err
-		} else {
-			result.OK = true
-			result.Client = c
 		}
 
 		log.Printf("Worker %d: job's done.\n\tResult: %+v\n", id, result)
@@ -117,7 +119,7 @@ func (s *Server) Start() error {
 		case r := <-results:
 			log.Printf("Got result: %+v\n", r)
 
-			if r.OK {
+			if r.OK() {
 				s.addClient(*r.Client)
 			} else {
 				r.Client.Disconnect(0x00) // TODO
