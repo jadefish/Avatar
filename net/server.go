@@ -122,7 +122,7 @@ func (s *Server) Start() error {
 			if r.OK() {
 				s.addClient(*r.Client)
 			} else {
-				r.Client.Disconnect(0x00) // TODO
+				r.Client.Disconnect(byte(avatar.LoginRejectionInvalidCredentials))
 			}
 		}
 	}

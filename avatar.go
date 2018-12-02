@@ -26,14 +26,16 @@ type LoginRejectionReason byte
 
 // Login rejection reasons
 const (
-	LoginRejectionInvalidAccount LoginRejectionReason = iota
+	LoginRejectionUnableToAuthenticate LoginRejectionReason = iota
 	LoginRejectionAccountInUse
 	LoginRejectionAccountBlocked
-	LoginRejectionInvalidPassword
+	LoginRejectionInvalidCredentials
 	LoginRejectionCommunicationProblem
 	LoginRejectionIGRConcurrencyLimitMet
 	LoginRejectionIGRTimeLimitMet
 	LoginRejectionIGRGeneralAuthFailure
+	_
+	LoginRejectionCharacterTransferInProgress
 )
 
 var (
