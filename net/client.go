@@ -92,7 +92,7 @@ func (c *Client) Connect() error {
 		return errors.Wrap(err, "connect")
 	}
 
-	if buf[0] != 0xEF || n != 21 {
+	if buf[0] != avatar.CommandLoginSeed || n != 21 {
 		return errors.New("bad packet")
 	}
 
@@ -123,7 +123,7 @@ func (c *Client) Connect() error {
 }
 
 func (c Client) Disconnect(reason byte) error {
-	_, err := c.conn.Write([]byte{0x82, reason})
+	_, err := c.conn.Write([]byte{avatar.CommandDisconnect, reason})
 
 	if err != nil {
 		return errors.Wrap(err, "disconnect")
@@ -170,7 +170,9 @@ func (c Client) Authenticate() (*authResult, error) {
 
 	// Validate dest, ensuring the decrypted next command is a login request
 	// and the provided account name and password are NUL-terminated:
-	if !(dest[0] == 0x80 && dest[30] == 0x00 && dest[60] == 0x00) {
+	if !(dest[0] == avatar.CommandLoginRequest &&
+		dest[30] == 0x00 &&
+		dest[60] == 0x00) {
 		return nil, errors.New("unable to decrypt")
 	}
 
@@ -203,9 +205,9 @@ func (c Client) ReceiveShardList(shards []avatar.Shard) error {
 	length := 6 + n*40
 
 	buf := make([]byte, 0, length)
-	buf = append(buf, 0xA8)
+	buf = append(buf, avatar.CommandGameServerList)
 	buf = append(buf, []byte{0x00, byte(length)}...)
-	buf = append(buf, 0xFF)
+	buf = append(buf, 0xFF) // or: 0xCC, 0x64, 0x5D?
 	buf = append(buf, []byte{0x00, byte(n)}...)
 
 	for i, shard := range shards {
