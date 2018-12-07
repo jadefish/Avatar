@@ -131,7 +131,7 @@ func (c Client) Disconnect(reason byte) error {
 
 	c.fsm.Transition("disconnect")
 
-	// Server must wait for EOF before the open connection can be closed.
+	err = c.conn.Close()
 
 	return err
 }
