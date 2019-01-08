@@ -2,13 +2,13 @@
 version: "3"
 
 services:
-  mysql:
-    container_name: mysql
-    build: ./docker/mysql
-    restart: on-failure
+  db:
+    build: ./docker/postgres
+    container_name: db
+    restart: always
     volumes:
-      - ./data:/var/lib/mysql
+      - ./db/data:/var/lib/postgres/data
     ports:
-     - 3306:3306
+     - 5432:5432
     environment:
-      MYSQL_ROOT_PASSWORD: password
+

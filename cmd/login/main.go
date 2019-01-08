@@ -2,24 +2,40 @@ package main
 
 import (
 	"log"
+	"os"
+	"strconv"
 
 	"github.com/jadefish/avatar/crypto/bcrypt"
-	"github.com/jadefish/avatar/mysql"
 	"github.com/jadefish/avatar/net"
+	"github.com/jadefish/avatar/pkg/database/postgres"
+	"github.com/pkg/errors"
+
+	env "github.com/joho/godotenv"
 )
 
 func main() {
-	db, err := mysql.Connect()
+	err := env.Load()
 
 	if err != nil {
 		log.Fatalln(err)
 	}
 
-	as := &mysql.AccountService{db}
-	ss := &mysql.ShardService{db}
+	db, err := postgres.Connect()
 
-	// TODO: move cost to separate configuration:
-	ps, err := bcrypt.NewPasswordService(bcrypt.DefaultCost)
+	if err != nil {
+		log.Fatalln(errors.Wrap(err, "postgres connect"))
+	}
+
+	as := &postgres.AccountService{DB: db}
+	ss := &postgres.ShardService{DB: db}
+
+	cost, err := strconv.Atoi(os.Getenv("BCRYPT_COST"))
+
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	ps, err := bcrypt.NewPasswordService(cost)
 
 	if err != nil {
 		log.Fatalln(err)
