@@ -1,0 +1,3 @@
+#!/usr/bin/env sh
+MIGRATE="${MIGRATE_BIN:-"${GOPATH}/bin/migrate"}"
+$MIGRATE create -dir db/migrations/schema -ext sql "$*"
