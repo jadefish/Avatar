@@ -4,13 +4,12 @@ CREATE OR REPLACE LANGUAGE 'plpgsql';
 
 -- Trigger for updating `updated_at` columns:
 CREATE OR REPLACE FUNCTION on_update_set_updated_at()
-LANGAUGE 'plpgsql'
 RETURNS TRIGGER AS $$
 BEGIN
 	NEW.updated_at = transaction_timestamp();
 	RETURN new;
 END;
-$$;
+$$ language 'plpgsql';
 
 -- Domain for email addresses:
 CREATE EXTENSION IF NOT EXISTS plperl;
