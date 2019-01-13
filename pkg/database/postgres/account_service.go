@@ -18,7 +18,7 @@ func (s *AccountService) GetAccountByID(id int) (*avatar.Account, error) {
 	err := s.DB.Get(account, `
 		SELECT a.*
 		FROM accounts a
-		WHERE a.id = ?
+		WHERE a.id = $1
 		AND a.deleted_at IS NULL;
 	`, id)
 
@@ -40,7 +40,7 @@ func (s *AccountService) GetAccountByEmail(email string) (*avatar.Account, error
 	err := s.DB.Get(account, `
 		SELECT a.*
 		FROM accounts a
-		WHERE a.email= ?
+		WHERE a.email= $1
 		AND a.deleted_at IS NULL;
 	`, email)
 
@@ -62,7 +62,7 @@ func (s *AccountService) GetAccountByName(name string) (*avatar.Account, error) 
 	err := s.DB.Get(account, `
 		SELECT a.*
 		FROM accounts a
-		WHERE a.name = ?
+		WHERE a.name = $1
 		AND a.deleted_at IS NULL;
 	`, name)
 
