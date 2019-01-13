@@ -66,12 +66,12 @@ func (s *AccountService) GetAccountByName(name string) (*avatar.Account, error) 
 		AND a.deleted_at IS NULL;
 	`, name)
 
-	if account.ID == 0 {
-		return nil, avatar.ErrNoAccountFound
-	}
-
 	if err != nil {
 		return nil, err
+	}
+
+	if account.ID == 0 {
+		return nil, avatar.ErrNoAccountFound
 	}
 
 	return account, nil
