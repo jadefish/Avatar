@@ -39,8 +39,8 @@ type CryptoService interface {
 // It is typically the IPv4 address of the client.
 type Seed uint32
 
-// ToIPv4 encodes the seed as an IPv4 address.
-func (s Seed) ToIPv4() net.IP {
+// IPv4 encodes the seed as an IPv4 address.
+func (s Seed) IPv4() net.IP {
 	var b [net.IPv4len]byte
 	binary.BigEndian.PutUint32(b[:], uint32(s))
 
