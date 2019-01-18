@@ -1,7 +1,9 @@
 package avatar
 
 import (
-	"net"
+	"bytes"
+	"encoding/binary"
+	"fmt"
 )
 
 type ClientState uint8
@@ -23,28 +25,47 @@ type ClientVersion struct {
 	Revision uint32
 }
 
+func (v ClientVersion) MarshalBinary() ([]byte, error) {
+	var b bytes.Buffer
+
+	binary.Write(&b, Encoding, v.Major)
+	binary.Write(&b, Encoding, v.Minor)
+	binary.Write(&b, Encoding, v.Patch)
+	binary.Write(&b, Encoding, v.Revision)
+
+	return b.Bytes(), nil
+}
+
+func (v *ClientVersion) UnmarshalBinary(data []byte) error {
+	r := bytes.NewReader(data)
+	err := binary.Read(r, Encoding, &v.Major)
+	err = binary.Read(r, Encoding, &v.Minor)
+	err = binary.Read(r, Encoding, &v.Patch)
+	err = binary.Read(r, Encoding, &v.Revision)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (v ClientVersion) String() string {
+	return fmt.Sprintf("%d.%d.%d.%d", v.Major, v.Minor, v.Patch, v.Revision)
+}
+
 type hasVersion interface {
-	Version() *ClientVersion
+	Version() ClientVersion
+	SetVersion(ClientVersion)
 }
 
-type hasState interface {
-	State() ClientState
-}
-
-type authenticates interface {
-	Authenticate() error
-}
-
-type connects interface {
-	Connect() error
-	Disconnect(reason byte) error
-	IPAddress() net.IP
+type hasCryptoService interface {
+	Crypto() CryptoService
+	SetCrypto(CryptoService)
 }
 
 // Client is a representation of a connected user.
 type Client interface {
 	hasVersion
-	hasState
-	connects
-	authenticates
+	hasCryptoService
 }
