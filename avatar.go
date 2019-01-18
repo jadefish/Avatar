@@ -1,10 +1,14 @@
 package avatar
 
 import (
+	"encoding"
+	"encoding/binary"
 	"errors"
 	"net"
 	"time"
 )
+
+var Encoding = binary.BigEndian
 
 type PopupMessageID byte
 
@@ -83,4 +87,11 @@ type AccountService interface {
 type PasswordService interface {
 	CreatePassword(password string) (string, error)
 	VerifyPassword(password, hash string) bool
+}
+
+// marshallable represents something capable of being decoded from and
+// encoded to a binary form.
+type marshallable interface {
+	encoding.BinaryMarshaler
+	encoding.BinaryUnmarshaler
 }
