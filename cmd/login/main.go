@@ -6,8 +6,8 @@ import (
 	"strconv"
 
 	"github.com/jadefish/avatar/crypto/bcrypt"
+	"github.com/jadefish/avatar/database/postgres"
 	"github.com/jadefish/avatar/net"
-	"github.com/jadefish/avatar/pkg/database/postgres"
 	"github.com/pkg/errors"
 
 	env "github.com/joho/godotenv"
