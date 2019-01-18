@@ -15,19 +15,19 @@ const (
 	hiMask3 = 0xffff0000
 )
 
-// ClassicCryptoService is a cryptography service compatible with modern
+// LoginCryptoService is a cryptography service compatible with modern
 // "classic" (2D) clients.
-type ClassicCryptoService struct {
+type LoginCryptoService struct {
 	seed           avatar.Seed
 	maskLo, maskHi uint32
 	keyLo, keyHi   uint32
 }
 
-// NewClassicCryptoService creates a new cryptography service.
-func NewClassicCryptoService(
+// NewLoginCryptoService creates a new cryptography service.
+func NewLoginCryptoService(
 	seed avatar.Seed,
 	version avatar.ClientVersion,
-) (*ClassicCryptoService, error) {
+) (*LoginCryptoService, error) {
 	maskLo := computeMaskLo(seed)
 	maskHi := computeMaskHi(seed)
 	keyPair, err := crypto.GetClientKeyPair(version)
@@ -36,7 +36,7 @@ func NewClassicCryptoService(
 		return nil, errors.Wrap(err, "cryptography service creation")
 	}
 
-	return &ClassicCryptoService{
+	return &LoginCryptoService{
 		seed:   seed,
 		maskLo: maskLo,
 		maskHi: maskHi,
@@ -58,12 +58,12 @@ func computeMaskHi(seed avatar.Seed) uint32 {
 }
 
 // GetSeed returns the client's seed.
-func (c ClassicCryptoService) GetSeed() avatar.Seed {
+func (c LoginCryptoService) GetSeed() avatar.Seed {
 	return c.seed
 }
 
 // GetMasks returns the pair of client masks.
-func (c ClassicCryptoService) GetMasks() avatar.KeyPair {
+func (c LoginCryptoService) GetMasks() avatar.KeyPair {
 	return avatar.KeyPair{
 		Lo: c.maskLo,
 		Hi: c.maskHi,
@@ -71,38 +71,40 @@ func (c ClassicCryptoService) GetMasks() avatar.KeyPair {
 }
 
 // GetKeys returns the pair of version-specific client keys.
-func (c ClassicCryptoService) GetKeys() avatar.KeyPair {
+func (c LoginCryptoService) GetKeys() avatar.KeyPair {
 	return avatar.KeyPair{
 		Lo: c.keyLo,
 		Hi: c.keyHi,
 	}
 }
 
-// Encrypt data using the client's cryptography facilities.
-func (c ClassicCryptoService) Encrypt(data []byte) ([]byte, error) {
-	// TODO
-	return []byte{0x00}, nil
+// Encrypt encrypts src, returning the encrypted data.
+// The length of the returned slice will always equal the length of the
+// source slice.
+func (c LoginCryptoService) Encrypt(src []byte) ([]byte, error) {
+	return loginCrypt(c, src)
 }
 
-// Decrypt data using the client's cryptography facilities.
-func (c ClassicCryptoService) Decrypt(data []byte) ([]byte, error) {
-	// TODO
-	return []byte{0x00}, nil
+// Decrypt src, returning the unencrypted data
+func (c LoginCryptoService) Decrypt(src []byte) ([]byte, error) {
+	return loginCrypt(c, src)
 }
 
-// LoginDecrypt decrypts the client's login data.
-func (c ClassicCryptoService) LoginDecrypt(src []byte) ([]byte, error) {
+// loginCrypt is capable of both encrypting and decrypting login packets.
+func loginCrypt(cs LoginCryptoService, src []byte) ([]byte, error) {
 	dest := make([]byte, len(src))
+	lo := cs.maskLo
+	hi := cs.maskHi
 
 	for i := range src {
-		dest[i] = src[i] ^ byte(c.maskLo)
+		dest[i] = src[i] ^ byte(lo)
 
-		maskLo := c.maskLo
-		maskHi := c.maskHi
+		maskLo := lo
+		maskHi := hi
 
-		c.maskLo = ((maskLo >> 1) | (maskHi << 31)) ^ c.keyLo
-		maskHi = ((maskHi >> 1) | (maskLo << 31)) ^ c.keyHi
-		c.maskHi = ((maskHi >> 1) | (maskLo << 31)) ^ c.keyHi
+		lo = ((maskLo >> 1) | (maskHi << 31)) ^ cs.keyLo
+		maskHi = ((maskHi >> 1) | (maskLo << 31)) ^ cs.keyHi
+		hi = ((maskHi >> 1) | (maskLo << 31)) ^ cs.keyHi
 	}
 
 	return dest, nil

@@ -33,7 +33,6 @@ type CryptoService interface {
 	GetSeed() Seed
 	GetMasks() KeyPair
 	GetKeys() KeyPair
-	LoginDecrypt(src []byte) (dest []byte, err error)
 }
 
 // Seed is a client encryption seed.
