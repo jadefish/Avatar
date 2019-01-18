@@ -81,6 +81,6 @@ type AccountService interface {
 
 // PasswordService is capable of generating and verifying password hashes.
 type PasswordService interface {
-	CreatePassword(password []byte) ([]byte, error)
-	VerifyPassword(password, hash []byte) bool
+	CreatePassword(password string) (string, error)
+	VerifyPassword(password, hash string) bool
 }

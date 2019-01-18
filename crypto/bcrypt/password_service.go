@@ -21,25 +21,26 @@ func NewPasswordService(cost int) (*passwordService, error) {
 		return nil, bcrypt.InvalidCostError(cost)
 	}
 
-	return &passwordService{
-		cost: cost,
-	}, nil
+	return &passwordService{cost: cost}, nil
 }
 
 // CreatePassword creates a bcrypt hash from the provided plaintext password.
-func (ps passwordService) CreatePassword(password []byte) ([]byte, error) {
-	p, err := bcrypt.GenerateFromPassword(password, ps.cost)
+func (ps passwordService) CreatePassword(password string) (string, error) {
+	p, err := bcrypt.GenerateFromPassword([]byte(password), ps.cost)
 
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
-	return p, nil
+	return string(p), nil
 }
 
 // VerifyPassword compares the provided plaintext password and bcrypt hash.
-func (passwordService) VerifyPassword(password, hash []byte) bool {
-	err := bcrypt.CompareHashAndPassword(hash, password)
+func (passwordService) VerifyPassword(password, hash string) bool {
+	p1 := []byte(password)
+	p2 := []byte(hash)
+
+	err := bcrypt.CompareHashAndPassword(p2, p1)
 
 	return err == nil
 }
