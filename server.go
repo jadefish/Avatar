@@ -7,4 +7,5 @@ type Server interface {
 
 	AccountService() AccountService
 	PasswordService() PasswordService
+	ShardService() ShardService
 }
