@@ -1,12 +1,10 @@
 package crypto
 
 import (
-	"bufio"
 	"fmt"
 	"log"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 
 	"github.com/jadefish/avatar"
@@ -22,6 +20,7 @@ var (
 	emptyPair = avatar.KeyPair{Lo: 0x00, Hi: 0x00}
 )
 
+// TODO: remove init
 func init() {
 	err := loadClientKeys()
 
@@ -44,8 +43,7 @@ func loadClientKeys() error {
 		}
 
 		rawKeys := make(map[string][2]uint32)
-		r := bufio.NewReader(file)
-		dec := yaml.NewDecoder(r)
+		dec := yaml.NewDecoder(file)
 		dec.SetStrict(true)
 
 		err = dec.Decode(&rawKeys)
@@ -69,9 +67,7 @@ func loadClientKeys() error {
 // If no key exists for the provided version, an empty key pair and an
 // "unsupported version" error are returned.
 func GetClientKeyPair(v avatar.ClientVersion) (avatar.KeyPair, error) {
-	b := strings.Builder{}
-	fmt.Fprintf(&b, "%d.%d.%d", v.Major, v.Minor, v.Patch)
-	key := b.String()
+	key := fmt.Sprintf("%d.%d.%d", v.Major, v.Minor, v.Patch)
 
 	if val, ok := keys[key]; ok {
 		return val, nil
