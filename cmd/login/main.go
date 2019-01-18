@@ -8,8 +8,6 @@ import (
 	"github.com/jadefish/avatar/crypto/bcrypt"
 	"github.com/jadefish/avatar/database/postgres"
 	"github.com/jadefish/avatar/net"
-	"github.com/pkg/errors"
-
 	env "github.com/joho/godotenv"
 )
 
@@ -23,7 +21,7 @@ func main() {
 	db, err := postgres.Connect()
 
 	if err != nil {
-		log.Fatalln(errors.Wrap(err, "postgres connect"))
+		panic(err)
 	}
 
 
