@@ -26,8 +26,6 @@ func main() {
 		log.Fatalln(errors.Wrap(err, "postgres connect"))
 	}
 
-	as := &postgres.AccountService{DB: db}
-	ss := &postgres.ShardService{DB: db}
 
 	cost, err := strconv.Atoi(os.Getenv("BCRYPT_COST"))
 
@@ -40,6 +38,9 @@ func main() {
 	if err != nil {
 		log.Fatalln(err)
 	}
+
+	as := postgres.NewAccountService(db)
+	ss := postgres.NewShardService(db)
 
 	server := net.NewServer(as, ps, ss)
 	err = server.Start()

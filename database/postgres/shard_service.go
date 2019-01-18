@@ -9,16 +9,23 @@ import (
 
 var errInvalidShardName = errors.New("invalid shard name")
 
-// ShardService facilitates interacting with shards.
-type ShardService struct {
-	DB *sqlx.DB
+// NewShardService creates a new shard service backed by PostgreSQL.
+func NewShardService(db *sqlx.DB) *shardService {
+	return &shardService{
+		db: db,
+	}
+}
+
+// shardService facilitates interacting with shards.
+type shardService struct {
+	db *sqlx.DB
 }
 
 // All retrieves all non-deleted shards.
-func (s ShardService) All() ([]avatar.Shard, error) {
+func (s shardService) All() ([]avatar.Shard, error) {
 	shards := make([]avatar.Shard, 0, 10)
 
-	err := s.DB.Get(shards, `
+	err := s.db.Get(shards, `
 		SELECT s.*
 		FROM shards s
 		WHERE s.deleted_at IS NULL
@@ -33,14 +40,14 @@ func (s ShardService) All() ([]avatar.Shard, error) {
 }
 
 // Find a non-deleted shard by name.
-func (s ShardService) Find(name string) (*avatar.Shard, error) {
+func (s shardService) Find(name string) (*avatar.Shard, error) {
 	if len(name) < 1 || len(name) > avatar.ShardNameLength {
 		return nil, errors.Wrap(errInvalidShardName, "find")
 	}
 
 	shard := &avatar.Shard{}
 
-	err := s.DB.Get(shard, `
+	err := s.db.Get(shard, `
 		SELECT s.*
 		FROM shards
 		WHERE s.name = ?

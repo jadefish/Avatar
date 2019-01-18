@@ -6,16 +6,23 @@ import (
 	"github.com/jadefish/avatar"
 )
 
-// AccountService facilitates interacting with user accounts.
-type AccountService struct {
-	DB *sqlx.DB
+// accountService facilitates interacting with user accounts.
+type accountService struct {
+	db *sqlx.DB
+}
+
+// NewAccountService creates a new account service backed by PostgreSQL.
+func NewAccountService(db *sqlx.DB) *accountService {
+	return &accountService{
+		db: db,
+	}
 }
 
 // GetAccountByID retrieves an account by its ID.
-func (s *AccountService) GetAccountByID(id int) (*avatar.Account, error) {
+func (s *accountService) GetAccountByID(id int) (*avatar.Account, error) {
 	account := &avatar.Account{}
 
-	err := s.DB.Get(account, `
+	err := s.db.Get(account, `
 		SELECT a.*
 		FROM accounts a
 		WHERE a.id = $1
@@ -34,10 +41,10 @@ func (s *AccountService) GetAccountByID(id int) (*avatar.Account, error) {
 }
 
 // GetAccountByEmail retrieves an account by its email.
-func (s *AccountService) GetAccountByEmail(email string) (*avatar.Account, error) {
+func (s *accountService) GetAccountByEmail(email string) (*avatar.Account, error) {
 	account := &avatar.Account{}
 
-	err := s.DB.Get(account, `
+	err := s.db.Get(account, `
 		SELECT a.*
 		FROM accounts a
 		WHERE a.email= $1
@@ -56,10 +63,10 @@ func (s *AccountService) GetAccountByEmail(email string) (*avatar.Account, error
 }
 
 // GetAccountByName retrieves an account by its name.
-func (s *AccountService) GetAccountByName(name string) (*avatar.Account, error) {
+func (s *accountService) GetAccountByName(name string) (*avatar.Account, error) {
 	account := &avatar.Account{}
 
-	err := s.DB.Get(account, `
+	err := s.db.Get(account, `
 		SELECT a.*
 		FROM accounts a
 		WHERE a.name = $1
