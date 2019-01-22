@@ -1,7 +1,6 @@
 package avatar
 
 import (
-	"encoding/binary"
 	"net"
 )
 
@@ -42,7 +41,7 @@ type Seed uint32
 // IPv4 encodes the seed as an IPv4 address.
 func (s Seed) IPv4() net.IP {
 	var b [net.IPv4len]byte
-	binary.BigEndian.PutUint32(b[:], uint32(s))
+	Encoding.PutUint32(b[:], uint32(s))
 
 	return net.IP(b[:])
 }
