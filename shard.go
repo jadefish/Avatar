@@ -24,8 +24,18 @@ type Shard struct {
 	TimeZone  string
 	Capacity  int
 	IPAddress net.IP
+}
 
-	Location time.Location
+// Location retrieves the named geographical location in which the shard
+// resides.
+func (s Shard) Location() (*time.Location, error) {
+	l, err := time.LoadLocation(s.TimeZone)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return l, nil
 }
 
 // PercentFull returns how full the shard is based on the number of clients
