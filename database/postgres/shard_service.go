@@ -25,7 +25,7 @@ type shardService struct {
 func (s shardService) All() ([]avatar.Shard, error) {
 	shards := make([]avatar.Shard, 0, 10)
 
-	err := s.db.Get(shards, `
+	err := s.db.Select(&shards, `
 		SELECT s.*
 		FROM shards s
 		WHERE s.deleted_at IS NULL
