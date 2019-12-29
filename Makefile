@@ -8,8 +8,8 @@ FMT ?= $(GO) fmt
 VET ?= $(GO) vet
 
 # Platform, architecture, and build flags:
-GOOS ?= linux
-GOARCH ?= amd64
+GOOS ?= $(shell go env GOOS)
+GOARCH ?= $(shell go env GOARCH)
 GOFLAGS ?= -v
 
 # Directories and files:
@@ -28,7 +28,7 @@ build: $(TARGETS)
 default: $(TARGETS) fmt vet
 
 $(TARGETS): go $(BIN_DIR) $(SRC_FILES)
-	$(info $(BLUE)Building$(RESET) $@ $(BLUE)for$(RESET) $(GOARCH)/$(GOOS)...)
+	$(info $(BLUE)Building$(RESET) $@ $(BLUE)for$(RESET) $(GOOS)/$(GOARCH)...)
 	env GOOS=$(GOOS) GOARCH=$(GOARCH) $(GO) build $(GOFLAGS) -o $@ $(PKG)
 
 $(BIN_DIR):
