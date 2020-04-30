@@ -15,10 +15,11 @@ GOFLAGS ?= -v
 # Directories and files:
 SRC_FILES = $(wildcard **/*.go)
 BIN_DIR ?= bin
+COVERAGE_DIR ?= coverage
 PKG := $(BINARIES:%=$(PKG)/$(PROJECT)/cmd/%)
 TARGETS := $(BINARIES:%=$(BIN_DIR)/%)
 
-.PHONY: go fmt vet deploy clean
+.PHONY: go fmt vet deploy clean test coverage
 build: $(TARGETS)
 default: $(TARGETS) fmt vet
 
@@ -36,6 +37,14 @@ vet:
 
 clean:
 	test -d $(BIN_DIR) && $(RM) -r $(BIN_DIR)
+	test -d $(COVERAGE_DIR) && $(RM) -r $(COVERAGE_DIR)
+
+test:
+	$(GO) test ./...
+
+coverage:
+	$(GO) test -coverprofile=$(COVERAGE_DIR)/cover.out ./...
+	$(GO) tool cover -html=$(COVERAGE_DIR)/cover.out -o $(COVERAGE_DIR)/cover.html
 
 go:
 ifndef GO

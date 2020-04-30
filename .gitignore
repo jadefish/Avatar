@@ -1,4 +1,5 @@
-/bin/*
+/bin
+/coverage
 /db/data
 
 .env
