@@ -1,7 +1,11 @@
 package bcrypt
 
 import (
+	"fmt"
+
 	"golang.org/x/crypto/bcrypt"
+
+	"github.com/jadefish/avatar"
 )
 
 // DefaultCost is the default cost value used when creating new a password
@@ -11,6 +15,8 @@ const DefaultCost = bcrypt.DefaultCost
 type passwordService struct {
 	cost int
 }
+
+var _ avatar.PasswordService = &passwordService{}
 
 // NewPasswordService creates a new password service capable of generating and
 // verifying bcrypt password hashes.
@@ -24,28 +30,33 @@ func NewPasswordService(cost int) (*passwordService, error) {
 	return &passwordService{cost: cost}, nil
 }
 
-// CreatePassword creates a bcrypt hash from the provided plaintext password.
-func (ps passwordService) CreatePassword(password string) (string, error) {
+// Hash creates a bcrypt hash from the provided plaintext password.
+func (ps passwordService) Hash(password string) (string, error) {
 	p, err := bcrypt.GenerateFromPassword([]byte(password), ps.cost)
 
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("bcrypt: create password: %w", err)
 	}
 
 	return string(p), nil
 }
 
-// VerifyPassword compares the provided plaintext password and bcrypt hash.
-func (passwordService) VerifyPassword(password, hash string) bool {
-	p1 := []byte(password)
-	p2 := []byte(hash)
+// Verify compares the provided plaintext password and bcrypt hash.
+func (passwordService) Verify(password, hash string) (error, bool) {
+	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
 
-	err := bcrypt.CompareHashAndPassword(p2, p1)
+	if err != nil {
+		err = fmt.Errorf("bcrypt: verify password: %w", err)
+	}
 
-	return err == nil
+	return err, err == nil
 }
 
-// Cost returns the cost value used to create the given bcrypt hash.
+// Cost returns the cost value used to create the given bcrypt password hash.
 func (passwordService) Cost(hash []byte) (int, error) {
 	return bcrypt.Cost(hash)
+}
+
+func (ps passwordService) String() string {
+	return fmt.Sprintf("bcrypt, cost=%d", ps.cost)
 }
