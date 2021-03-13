@@ -8,5 +8,4 @@ require (
 	github.com/mattn/go-sqlite3 v1.10.0 // indirect
 	github.com/pkg/errors v0.8.0
 	golang.org/x/crypto v0.0.0-20180830192347-182538f80094
-	gopkg.in/yaml.v2 v2.2.1
 )
