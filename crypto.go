@@ -1,47 +1,30 @@
 package avatar
 
-import (
-	"net"
-)
-
-// encrypter can encrypt data.
-type encrypter interface {
-	Encrypt(src []byte) (dest []byte, err error)
-}
-
-// decrypter can decrypt data.
-type decrypter interface {
-	Decrypt(src []byte) (dest []byte, err error)
-}
-
-// cryptographer can encrypt and decrypt data.
-type cryptographer interface {
-	encrypter
-	decrypter
-}
-
 // KeyPair contains a pair of version-specific client encryption keys.
 type KeyPair struct {
 	Lo, Hi uint32
 }
 
-// CryptoService provides cryptographic services for client data.
+// A CryptoService is capable of encrypting and decrypting data.
 type CryptoService interface {
-	cryptographer
+	// Encrypt src into dst.
+	Encrypt(src []byte, dst []byte) error
 
+	// Decrypt src into dst.
+	Decrypt(src []byte, dst []byte) error
+
+	// GetSeed returns the Seed used to initialize the CryptoService.
 	GetSeed() Seed
-	GetMasks() KeyPair
-	GetKeys() KeyPair
 }
 
-// Seed is a client encryption seed.
-// It is typically the IPv4 address of the client.
+// Seed is a value used to initialize the state of a CryptoService.
 type Seed uint32
 
-// IPv4 encodes the seed as an IPv4 address.
-func (s Seed) IPv4() net.IP {
-	var b [net.IPv4len]byte
-	Encoding.PutUint32(b[:], uint32(s))
+// PasswordService is capable of generating and verifying password hashes.
+type PasswordService interface {
+	// Hash creates a password hash from the plaintext string.
+	Hash(password string) (string, error)
 
-	return net.IP(b[:])
+	// Verify that the plaintext password matches the encoded hash.
+	Verify(password, hash string) (error, bool)
 }
