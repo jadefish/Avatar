@@ -3,4 +3,3 @@
 /db/data
 
 .env
-/docker/postgres/postgres-passwd
