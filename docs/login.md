@@ -22,6 +22,8 @@ _Newer_ refers to client version 6.0.5.0 or later.
 	* not variable length, but length has changed over time with newer clients
 5. receive 3 bytes: 0xA0 Select Server (encrypted)
 6. send 11 bytes: 0x8C Connect to Game Server
+   * last 4 bytes: "new key" (uint32). if not specified, client seed from 0xEF
+	 is used.
 7. client now establishes a new connection to the selected game server
 
 ### Game server
