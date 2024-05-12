@@ -1,16 +1,16 @@
 package storage
 
-// ProviderName captures the name of a supported storage provider.
-type ProviderName string
+// Adapter captures the name of a supported storage adapters.
+type Adapter string
 
-// Valid indicates whether the provider name is valid.
-func (name ProviderName) Valid() bool {
+// Valid indicates whether the adapters name is valid.
+func (name Adapter) Valid() bool {
 	return name == SQLite3 || name == Memory
 }
 
-// Supported storage providers.
+// Supported storage adapters.
 const (
-	None    ProviderName = ""
-	SQLite3 ProviderName = "sqlite3"
-	Memory  ProviderName = "memory"
+	None    Adapter = ""
+	SQLite3 Adapter = "sqlite3"
+	Memory  Adapter = "memory"
 )

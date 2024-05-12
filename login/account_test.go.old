@@ -1,10 +1,8 @@
-package avatar_test
+package login_test
 
 import (
 	"net"
 	"testing"
-
-	"github.com/jadefish/avatar/pkg/crypto/bcrypt"
 
 	. "github.com/jadefish/avatar"
 	"github.com/jadefish/avatar/pkg/storage/memory"
@@ -21,7 +19,7 @@ func accountRepo(t *testing.T) AccountRepository {
 func passwordService(t *testing.T) PasswordService {
 	t.Helper()
 
-	ps, err := bcrypt.NewPasswordService(bcrypt.DefaultCost)
+	ps, err := NewPasswordService(DefaultCost)
 
 	if err != nil {
 		t.Fatal(err)
@@ -50,21 +48,23 @@ func TestAccountService_Create(t *testing.T) {
 	// Invariant: accounts must have a unique name.
 	name := "duplicate_account_name"
 	email := "what@ever.com"
-	err = as.Create(CreateAccountParameters{
-		Name:     name,
-		Email:    email,
-		Password: "meowmix",
-	})
+	err = as.Create(
+		CreateAccountParameters{
+			Name:     name,
+			Email:    email,
+			Password: "meowmix",
+		})
 
 	if err != nil {
 		t.Fatal("unable to create account")
 	}
 
-	err = as.Create(CreateAccountParameters{
-		Name:     name,
-		Email:    "another@email.com",
-		Password: "woofwoof",
-	})
+	err = as.Create(
+		CreateAccountParameters{
+			Name:     name,
+			Email:    "another@email.com",
+			Password: "woofwoof",
+		})
 
 	switch err {
 	case ErrDuplicateAccountName:
@@ -75,11 +75,12 @@ func TestAccountService_Create(t *testing.T) {
 	}
 
 	// Invariant: accounts must have a unique email address.
-	err = as.Create(CreateAccountParameters{
-		Name:     "another_account",
-		Email:    email,
-		Password: "hunter123",
-	})
+	err = as.Create(
+		CreateAccountParameters{
+			Name:     "another_account",
+			Email:    email,
+			Password: "hunter123",
+		})
 
 	switch err {
 	case ErrDuplicateAccountEmail:
@@ -91,12 +92,13 @@ func TestAccountService_Create(t *testing.T) {
 
 	// Attempted creation of an Account from valid parameters should not return
 	// an error.
-	err = as.Create(CreateAccountParameters{
-		Name:       "my well formed account name",
-		Email:      "a.super.cool.email@a_domain.com",
-		Password:   "unguessable",
-		CreationIP: net.IPv4zero,
-	})
+	err = as.Create(
+		CreateAccountParameters{
+			Name:       "my well formed account name",
+			Email:      "a.super.cool.email@a_domain.com",
+			Password:   "unguessable",
+			CreationIP: net.IPv4zero,
+		})
 
 	if err != nil {
 		t.Error("create Account with valid parameters failed")
@@ -109,12 +111,13 @@ func TestAccountService_Block(t *testing.T) {
 	as := NewAccountService(ar, ps)
 
 	name := "account'"
-	err := as.Create(CreateAccountParameters{
-		Name:       name,
-		Email:      "email@address.com",
-		Password:   "unguessable",
-		CreationIP: net.IPv4zero,
-	})
+	err := as.Create(
+		CreateAccountParameters{
+			Name:       name,
+			Email:      "email@address.com",
+			Password:   "unguessable",
+			CreationIP: net.IPv4zero,
+		})
 
 	if err != nil {
 		t.Fatal("unable to create account")
@@ -147,12 +150,13 @@ func TestAccountService_Unblock(t *testing.T) {
 	as := NewAccountService(ar, ps)
 
 	name := "account'"
-	err := as.Create(CreateAccountParameters{
-		Name:       name,
-		Email:      "email@address.com",
-		Password:   "unguessable",
-		CreationIP: net.IPv4zero,
-	})
+	err := as.Create(
+		CreateAccountParameters{
+			Name:       name,
+			Email:      "email@address.com",
+			Password:   "unguessable",
+			CreationIP: net.IPv4zero,
+		})
 
 	if err != nil {
 		t.Fatal("unable to create account")

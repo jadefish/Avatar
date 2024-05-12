@@ -1,0 +1,46 @@
+package commands
+
+import (
+	"fmt"
+
+	"github.com/jadefish/avatar/login"
+)
+
+const (
+	MaxAccountNameLength = 30
+	MaxPasswordLength    = 30
+)
+
+// Authenticate a user's credentials.
+type Authenticate struct {
+	repo login.AccountRepository
+}
+
+func (cmd Authenticate) Call(name, password string) error {
+	if len(name) < 1 ||
+		len(password) < 1 ||
+		len(name) > MaxAccountNameLength ||
+		len(password) > MaxPasswordLength {
+		return login.ErrInvalidCredentials
+	}
+
+	account, err := cmd.repo.FindByName(name)
+
+	if err != nil {
+		return fmt.Errorf("authenticate: %w", err)
+	}
+
+	_, ok := cmd.repo.PasswordService.Verify(password, account.PasswordHash)
+
+	if !ok {
+		return login.ErrInvalidCredentials
+	}
+
+	// TODO: check if account is in use, and return an error if so.
+
+	if account.Blocked {
+		return login.ErrAccountBlocked
+	}
+
+	return nil
+}

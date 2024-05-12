@@ -12,7 +12,7 @@ import (
 
 // keys contains client encryption keys.
 // The fourth version field ("Revision") is not used.
-var keys = map[avatar.Version]avatar.KeyPair{
+var keys = map[avatar.Version]KeyPair{
 	{7, 0, 87, 0}: {0x0AA317E7F, 0x03CA0828D},
 	{7, 0, 86, 0}: {0x0AAE5227F, 0x03D7A689D},
 	{7, 0, 85, 0}: {0x0AAC95E7F, 0x03D33D2AD},
@@ -113,13 +113,13 @@ var keys = map[avatar.Version]avatar.KeyPair{
 	{6, 0, 5, 0}:  {0x0A210DE7F, 0x02E0B97AD},
 }
 
-var emptyPair = &avatar.KeyPair{Lo: 0, Hi: 0}
+var emptyPair = &KeyPair{Lo: 0, Hi: 0}
 
 // GetKeyPair returns a pair of client encryption keys for the provided client
 // version. If no key pair exists for the provided version, an empty key pair
 // and an "unsupported version" error are returned. The empty key pair should
 // not be used for encryption purposes.
-func GetKeyPair(version *avatar.Version) (avatar.KeyPair, error) {
+func GetKeyPair(version *avatar.Version) (KeyPair, error) {
 	// zero out the Revision field since it is irrelevant to client keys:
 	v := avatar.Version{version.Major, version.Minor, version.Patch, 0}
 

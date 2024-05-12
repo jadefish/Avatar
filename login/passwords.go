@@ -1,22 +1,14 @@
-package bcrypt
+package login
 
 import (
 	"fmt"
 
 	"golang.org/x/crypto/bcrypt"
-
-	"github.com/jadefish/avatar"
 )
-
-// DefaultCost is the default cost value used when creating new a password
-// hash.
-const DefaultCost = bcrypt.DefaultCost
 
 type passwordService struct {
 	cost int
 }
-
-var _ avatar.PasswordService = &passwordService{}
 
 // NewPasswordService creates a new password service capable of generating and
 // verifying bcrypt password hashes.

@@ -1,0 +1,137 @@
+package tcp
+
+import (
+	"bufio"
+	"encoding/hex"
+	"io"
+	"log"
+	"net"
+
+	"github.com/jadefish/avatar/pkg/crypto"
+)
+
+type Client struct {
+	io.ReadWriteCloser
+	crypto.Cryptographer
+
+	conn net.Conn
+	rw   *bufio.ReadWriter
+}
+
+// NewClient creates a new Client that will use the provided conn for communication.
+func NewClient(conn net.Conn) Client {
+	r := bufio.NewReaderSize(conn, MaxPacketSize)
+	w := bufio.NewWriterSize(conn, MaxPacketSize)
+
+	return Client{
+		conn:          conn,
+		rw:            bufio.NewReadWriter(r, w),
+		Cryptographer: crypto.NilCryptographer,
+	}
+}
+
+func (c *Client) identifier() string {
+	return c.conn.RemoteAddr().String()
+}
+
+// Read at most len(p) bytes from the client.
+func (c *Client) Read(p []byte) (int, error) {
+	return c.rw.Read(p)
+}
+
+// Write the contents of p to the client.
+func (c *Client) Write(p []byte) (int, error) {
+	n, err := c.rw.Write(p)
+
+	if err == nil {
+		err = c.rw.Flush()
+	}
+
+	return n, err
+}
+
+// Close the client's connection.
+//
+// Any buffered data is written to the client before closing.
+func (c *Client) Close() error {
+	_ = c.rw.Flush()
+
+	return c.conn.Close()
+}
+
+// TODO: move to server, or higher:
+// // SendCommand writes the contents of a sendable command to the Client.
+// func (c *Client) SendCommand(cmd binary.SendableCommand) error {
+// 	data, err := cmd.MarshalBinary(ByteOrder)
+//
+// 	if err != nil {
+// 		return fmt.Errorf("send: %w", err)
+// 	}
+//
+// 	if len(data) > MaxPacketSize {
+// 		return errors.New("send: data too large")
+// 	}
+//
+// 	if data[0] != byte(cmd.ID()) {
+// 		return fmt.Errorf("send: unexpected ID 0x%X", data[0])
+// 	}
+//
+// 	n, err := c.conn.Write(data)
+//
+// 	if n < len(data) {
+// 		return errors.New("send: could not send all data")
+// 	}
+//
+// 	dumpBytes("send", c, data, n)
+//
+// 	return err
+// }
+//
+// // ReceiveCommand reads a packet from the Client and unmarshals its data into a command.
+// func (c *Client) ReceiveCommand(cmd binary.ReceivableCommand) error {
+// 	var size int
+//
+// 	if cmd.IsVariableLength() {
+// 		size = MaxPacketSize
+// 	} else {
+// 		size = cmd.ExpectedLength()
+// 	}
+//
+// 	buf := make([]byte, size)
+// 	n, err := c.Read(buf)
+//
+// 	if err != nil {
+// 		return fmt.Errorf("receive: %w", err)
+// 	}
+//
+// 	buf = buf[:n]
+//
+// 	if cmd.IsEncrypted() {
+// 		if err := c.Crypto.Decrypt(buf, buf); err != nil {
+// 			return fmt.Errorf("receive: %w", err)
+// 		}
+// 	}
+//
+// 	dumpBytes("recv", c, buf, n)
+//
+// 	if buf[0] != byte(cmd.ID()) {
+// 		return fmt.Errorf("receive: unexpected ID 0x%X", buf[0])
+// 	}
+//
+// 	if err = cmd.UnmarshalBinary(ByteOrder, buf); err != nil {
+// 		return fmt.Errorf("receive: %w", err)
+// 	}
+//
+// 	return nil
+// }
+
+func (c *Client) dumpBytes(msg string, p []byte, n int) {
+	// TODO: remove/toggle debug logging
+	log.Printf(
+		"(%s) %s: %d bytes:\n%s\n",
+		c.conn.RemoteAddr(),
+		msg,
+		n,
+		hex.Dump(p[0:n]),
+	)
+}

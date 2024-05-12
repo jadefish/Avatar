@@ -1,0 +1,306 @@
+package login
+
+import (
+	"crypto/rand"
+	"errors"
+	"fmt"
+	"io"
+	"net"
+	"time"
+
+	"github.com/jadefish/avatar/login/commands"
+	"github.com/jadefish/avatar/pkg/encoding/binary"
+	"github.com/jadefish/avatar/pkg/tcp"
+
+	"github.com/jadefish/avatar"
+)
+
+// TODO: remove these when shards are loaded from a shard service.
+var tz *time.Location
+var tmpIP net.IP
+
+func init() {
+	// TODO: remove `init` when shards are loaded from a shard service.
+	var err error
+	if tz, err = time.LoadLocation("America/Detroit"); err != nil {
+		panic(err)
+	}
+
+	if tmpIP = net.ParseIP("192.168.0.20"); tmpIP == nil {
+		panic("unable to parse tmpIP")
+	} else {
+		tmpIP = tmpIP.To4()
+	}
+}
+
+func loginDeniedReason(err error) binary.LoginDeniedReason {
+	if errors.Is(err, ErrInvalidCredentials) {
+		return binary.LoginDeniedReasonUnableToAuthenticate
+	} else if errors.Is(err, ErrAccountNotFound) {
+		return binary.LoginDeniedReasonUnableToAuthenticate
+	} else if errors.Is(err, ErrAccountInUse) {
+		return binary.LoginDeniedReasonAccountInUse
+	} else if errors.Is(err, ErrAccountBlocked) {
+		return binary.LoginDeniedReasonAccountBlocked
+	} else {
+		return binary.LoginDeniedReasonCommunicationProblem
+	}
+
+	// TODO: server at capacity, game server down, timeouts?
+}
+
+func (s *Server) denyLogin(client *tcp.Client, err error) error {
+	// Provide a reason if we can still send data to the Client:
+	if !errors.Is(err, io.EOF) {
+		_ = client.SendCommand(&binary.LoginDenied{Reason: loginDeniedReason(err)})
+	}
+
+	return s.Disconnect(&client.Client)
+}
+
+func (s *Server) addClient(client *tcp.Client) error {
+	id := client.Identifier
+
+	if _, exists := s.clients.Load(id); exists {
+		return ErrAccountInUse
+	}
+
+	s.clients.Store(id, client)
+	return s.clientRepo.Save(&client.Client)
+}
+
+func (s *Server) authenticate(client *tcp.Client) error {
+	// 1. receive Login Seed:
+	loginSeed := &binary.LoginSeed{}
+	if err := client.ReceiveCommand(loginSeed); err != nil {
+		return fmt.Errorf("authenticate Client: %w", err)
+	}
+
+	cs, err := NewDecrypter(loginSeed.Seed, &loginSeed.Version)
+
+	if err != nil {
+		return fmt.Errorf("authenticate Client: %w", err)
+	}
+
+	client.CryptoService = cs
+
+	// 2. receive Login Request:
+	loginRequest := &binary.LoginRequest{}
+	if err := client.ReceiveCommand(loginRequest); err != nil {
+		return fmt.Errorf("authenticate Client: %w", err)
+	}
+
+	// 3. Authenticate provided credentials:
+	_, err = commands.Authenticate{Accounts: s.Accounts}.
+		Call(loginRequest.AccountName, loginRequest.Password)
+
+	if err != nil {
+		return fmt.Errorf("authenticate Client: %w", err)
+	}
+
+	client.State = avatar.ClientStateAuthenticated
+
+	if err := s.clientRepo.Save(&client.Client); err != nil {
+		return fmt.Errorf("authenticate Client: %w", err)
+	}
+
+	if err := s.addClient(client); err != nil {
+		return fmt.Errorf("authenticate Client: %w", err)
+	}
+
+	// 4. send Game Server List:
+	// TODO: populate list from some shard service
+	gameServerList := &binary.GameServerList{SystemInfoFlag: binary.SystemInfoFlagUnknown}
+	gameServerList.AddItem(
+		&binary.GameServerListItem{
+			Index:       0,
+			Name:        "Foo",
+			PercentFull: 10,
+			TimeZone:    tz,
+			IP:          tmpIP,
+		},
+	)
+
+	if err := client.SendCommand(gameServerList); err != nil {
+		return fmt.Errorf("authenticate Client: %w", err)
+	}
+
+	return nil
+}
+
+// relay a Client to the game server indicated by the received "Connect to Game
+// Server" packet.
+func (s *Server) relay(client *tcp.Client) error {
+	// 0. recv 268 bytes: 0xD9 Client Info (encrypted)
+	//    Client does not always send this packet.
+	// 1. recv   3 bytes: 0xA0 Select Game Server (encrypted)
+	// 2. send  11 bytes: 0x8C Connect to Game Server
+	buf := make([]byte, tcp.MaxPacketSize)
+	n, err := client.Read(buf)
+
+	if err != nil {
+		return fmt.Errorf("relay Client: %w", err)
+	}
+
+	buf = buf[:n]
+
+	if err := client.Decrypt(buf, buf); err != nil {
+		return fmt.Errorf("relay Client: %w", err)
+	}
+
+	switch buf[0] {
+	case 0xD9:
+		// Client sent optional packet 0xD9 Client Info.
+		// TODO: do something with Client Info?
+
+		// prep for next packet:
+		buf = make([]byte, 3)
+		n, err = client.Read(buf)
+
+		if err != nil {
+			return fmt.Errorf("relay Client: %w", err)
+		}
+
+		if err := client.Decrypt(buf, buf); err != nil {
+			return fmt.Errorf("relay Client: %w", err)
+		}
+
+		fallthrough
+	case 0xA0:
+		cmd := &binary.SelectServer{}
+		if err := cmd.UnmarshalBinary(tcp.ByteOrder, buf); err != nil {
+			return fmt.Errorf("relay Client: %w", err)
+		}
+		key := make([]byte, 4)
+		_, err := rand.Read(key)
+
+		if err != nil {
+			return fmt.Errorf("relay Client: %w", err)
+		}
+
+		client.Key = key
+
+		if err := s.clientRepo.Save(&client.Client); err != nil {
+			return fmt.Errorf("relay client: %w", err)
+		}
+
+		// TODO: match up cmd.Index with game server list index
+		connectToGameServer := &binary.ConnectToGameServer{
+			IP:     tmpIP,
+			Port:   7780,
+			NewKey: tcp.ByteOrder.Uint32(client.Key),
+		}
+
+		if err := client.SendCommand(connectToGameServer); err != nil {
+			return fmt.Errorf("relay Client: %w", err)
+		}
+	default:
+		return fmt.Errorf("relay Client: unexpected packet 0x%X", buf[0])
+	}
+
+	return nil
+}
+
+// Start the server, allowing it to accept and process incoming Client connections.
+func (s *Server) Start() error {
+	var err error
+	s.listener, err = net.Listen("tcp", s.addr)
+
+	if err != nil {
+		return fmt.Errorf("listen: %w", err)
+	}
+
+	s.log.Println("listening on", s.addr)
+
+	go func() {
+		for {
+			select {
+			case err := <-s.errs:
+				if err != nil {
+					s.log.Println(err)
+				}
+			case <-s.stop:
+				return
+			}
+		}
+	}()
+
+accept:
+	for {
+		select {
+		case <-s.stop:
+			break accept
+		default:
+		}
+
+		if conn, err := s.listener.Accept(); err != nil {
+			s.errs <- fmt.Errorf("accept: %w", err)
+		} else {
+			go s.handleConn(conn)
+		}
+	}
+
+	return nil
+}
+
+func (s *Server) handleConn(conn net.Conn) {
+	s.log.Println("new connection from", conn.RemoteAddr())
+	client := tcp.NewClient(conn)
+	// _ = conn.SetDeadline(time.Now().Add(10 * time.Second))
+
+	for {
+		switch client.State {
+		default:
+			s.log.Println("unknown Client state:", client.State)
+			s.errs <- s.Disconnect(&client.Client)
+			return
+		case avatar.ClientStateNew:
+			// New clients need to be authenticated.
+			if err := s.authenticate(client); err != nil {
+				s.errs <- s.denyLogin(client, err)
+				return
+			}
+		case avatar.ClientStateAuthenticated:
+			// Authenticated clients need to be relayed to the game server they have selected.
+			if err := s.relay(client); err != nil {
+				s.errs <- s.denyLogin(client, err)
+				return
+			}
+
+			// Client has been relayed and has established a new connection to its selected game
+			// server.
+			// TODO: verify connection to game server before disconnecting?
+			s.errs <- s.Disconnect(&client.Client)
+			return
+		}
+	}
+}
+
+// Stop the server, disconnecting connected clients and preventing new connections from being
+// accepted.
+func (s *Server) Stop() error {
+	s.log.Println("Stopping server...")
+	s.clients.Range(func(key any, value any) bool {
+		client := value.(*tcp.Client)
+		_ = s.Disconnect(&client.Client)
+		return true
+	})
+	err := s.listener.Close()
+	s.stop <- true
+	close(s.stop)
+	close(s.errs)
+
+	return err
+}
+
+// Disconnect Client from the server, closing its connection.
+func (s *Server) Disconnect(client *avatar.Client) error {
+	err := client.Close()
+
+	if err == nil {
+		s.clients.Delete(client.Identifier)
+		err = s.clientRepo.Remove(client)
+	}
+
+	return err
+}

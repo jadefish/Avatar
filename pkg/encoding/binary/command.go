@@ -43,7 +43,7 @@ const (
 	SystemInfoFlagAll                    SystemInfoFlag = 0xFF
 )
 
-// LoginDeniedReason captures the reason the login server has denied a client's
+// LoginDeniedReason captures the reason the cmd server has denied a client's
 // attempt to log in.
 type LoginDeniedReason byte
 

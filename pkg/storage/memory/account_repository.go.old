@@ -6,15 +6,16 @@ import (
 	"time"
 
 	"github.com/jadefish/avatar"
+	"github.com/jadefish/avatar/login"
 )
 
 type accountRepo struct {
 	m    sync.RWMutex
 	id   avatar.EntityID
-	data map[avatar.EntityID]*avatar.Account
+	data map[avatar.EntityID]*login.Account
 }
 
-var _ avatar.AccountRepository = &accountRepo{}
+var _ login.AccountRepository = &accountRepo{}
 
 var (
 	errNoAccount            = errors.New("account does not exist")
@@ -23,14 +24,14 @@ var (
 
 // NewAccountRepo creates a new account repository using the provided map as
 // storage.
-func NewAccountRepo(db map[avatar.EntityID]*avatar.Account) *accountRepo {
+func NewAccountRepo(db map[avatar.EntityID]*login.Account) *accountRepo {
 	return &accountRepo{sync.RWMutex{}, 1, db}
 }
 
 // Get a non-deleted account by ID.
 // Callers are responsible for acquiring and releasing a read lock.
 // If no account is found, a nil pointer is returned.
-func (repo *accountRepo) getKept(id avatar.EntityID) *avatar.Account {
+func (repo *accountRepo) getKept(id avatar.EntityID) *login.Account {
 	account, ok := repo.data[id]
 
 	if ok && account.DeletedAt == nil {
@@ -41,7 +42,7 @@ func (repo *accountRepo) getKept(id avatar.EntityID) *avatar.Account {
 }
 
 // Get an Account by its ID.
-func (repo *accountRepo) Get(id avatar.EntityID) (*avatar.Account, error) {
+func (repo *accountRepo) Find(id avatar.EntityID) (*login.Account, error) {
 	repo.m.RLock()
 	defer repo.m.RUnlock()
 
@@ -55,7 +56,7 @@ func (repo *accountRepo) Get(id avatar.EntityID) (*avatar.Account, error) {
 }
 
 // Create a new Account.
-func (repo *accountRepo) Create(data avatar.CreateAccountData) error {
+func (repo *accountRepo) Create(data login.CreateAccount) error {
 	repo.m.Lock()
 	defer repo.m.Unlock()
 
@@ -67,7 +68,7 @@ func (repo *accountRepo) Create(data avatar.CreateAccountData) error {
 	}
 
 	now := time.Now()
-	account := &avatar.Account{
+	account := &login.Account{
 		ID:             id,
 		Name:           data.Name,
 		Email:          data.Email,
@@ -88,7 +89,7 @@ func (repo *accountRepo) Create(data avatar.CreateAccountData) error {
 }
 
 // Update an Account.
-func (repo *accountRepo) Update(id avatar.EntityID, data avatar.UpdateAccountData) error {
+func (repo *accountRepo) Update(id avatar.EntityID, data login.UpdateAccountData) error {
 	repo.m.Lock()
 	defer repo.m.Unlock()
 
@@ -130,7 +131,7 @@ func (repo *accountRepo) Delete(id avatar.EntityID) error {
 }
 
 // FindByName retrieves an account by its name.
-func (repo *accountRepo) FindByName(name string) (*avatar.Account, error) {
+func (repo *accountRepo) FindByName(name string) (*login.Account, error) {
 	repo.m.RLock()
 	defer repo.m.RUnlock()
 
@@ -145,7 +146,7 @@ func (repo *accountRepo) FindByName(name string) (*avatar.Account, error) {
 
 // FindByEmail retrieves an account by its email.
 // No error is returned if the account could not be found.
-func (repo *accountRepo) FindByEmail(email string) (*avatar.Account, error) {
+func (repo *accountRepo) FindByEmail(email string) (*login.Account, error) {
 	repo.m.RLock()
 	defer repo.m.RUnlock()
 

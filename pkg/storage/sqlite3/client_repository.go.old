@@ -1,0 +1,121 @@
+package sqlite3
+
+import (
+	"database/sql"
+	"errors"
+	"fmt"
+	"strconv"
+	"strings"
+
+	"github.com/jadefish/avatar"
+	"github.com/jmoiron/sqlx"
+)
+
+type clientRepo struct {
+	db *sqlx.DB
+}
+
+type dbClient struct {
+	Identifier string `db:"client_identifier"`
+	Version    string `db:"version"`
+	LoginKey   []byte `db:"login_key"`
+	State      int    `db:"version"`
+	IPAddress  string `db:"ip_address"`
+	AccountID  int    `db:"account_id"`
+}
+
+var _ avatar.ClientRepository = &clientRepo{}
+
+func (repo clientRepo) Get(id avatar.ClientIdentifier) (*avatar.Client, error) {
+	dbClient := &dbClient{}
+	err := transaction(repo.db, func(tx *sqlx.Tx) error {
+		query := repo.db.Rebind(`
+			select c.*
+			from clients c
+			where c.client_identifier = ?;
+		`)
+
+		return repo.db.Get(dbClient, query, id)
+	})
+
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	tokens := strings.Split(dbClient.Version, ".")
+	numbers := [4]uint32{}
+
+	if len(tokens) < 4 {
+		return nil, errors.New("get client: malformed client version")
+	}
+
+	for i, v := range tokens {
+		if n, err := strconv.Atoi(v); err != nil {
+			return nil, errors.New("get client: malformed client version")
+		} else {
+			numbers[i] = uint32(n)
+		}
+	}
+
+	return &avatar.Client{
+		Identifier: avatar.ClientIdentifier(dbClient.Identifier),
+		State:      avatar.ClientState(dbClient.State),
+		Version:    avatar.Version{numbers[0], numbers[1], numbers[2], numbers[3]},
+		Key:        dbClient.LoginKey,
+	}, nil
+}
+
+func (repo clientRepo) Save(client *avatar.Client) error {
+	version := fmt.Sprintf("%d.%d.%d.%d",
+		client.Version.Major,
+		client.Version.Minor,
+		client.Version.Patch,
+		client.Version.Revision)
+	dbClient := &dbClient{
+		Identifier: string(client.Identifier),
+		Version:    version,
+		LoginKey:   client.Key,
+		State:      int(client.State),
+		AccountID:  int(client.Account.ID),
+	}
+	err := transaction(repo.db, func(tx *sqlx.Tx) error {
+		query := tx.Rebind(`
+			insert into clients(client_identifier, version, login_key, state)
+			values (?, ?, ?, ?)
+			on conflict(client_identifier) do update set
+				version=excluded.version,
+				login_key=excluded.login_key,
+				state=excluded.state;
+		`)
+		_, err := tx.Exec(query,
+			dbClient.Identifier,
+			dbClient.Version,
+			dbClient.LoginKey,
+			dbClient.State)
+
+		return err
+	})
+
+	if err != nil {
+		return fmt.Errorf("save client: %s", err)
+	}
+
+	return nil
+}
+
+func (repo clientRepo) Remove(client *avatar.Client) error {
+	return transaction(repo.db, func(tx *sqlx.Tx) error {
+		query := repo.db.Rebind(`
+			delete from clients
+			where client_identifier = ?
+			limit 1;
+		`)
+		_, err := tx.Exec(query, client.Identifier)
+
+		return err
+	})
+}

@@ -1,0 +1,39 @@
+package login
+
+import (
+	"fmt"
+	"net"
+
+	"github.com/jadefish/avatar/pkg/crypto"
+)
+
+//go:generate stringer -type=clientState
+type clientState int
+
+const (
+	clientStateNew clientState = iota
+	clientStateAuthenticated
+)
+
+func newClient(conn net.Conn) client {
+	return client{
+		Decrypter: crypto.NilCryptographer,
+		conn:      conn,
+		state:     clientStateNew,
+	}
+}
+
+type client struct {
+	crypto.Decrypter
+
+	conn  net.Conn
+	state clientState
+}
+
+func (c client) identifier() string {
+	return c.conn.RemoteAddr().String()
+}
+
+func (c client) String() string {
+	return fmt.Sprintf("%s (%s)", c.identifier(), c.state)
+}

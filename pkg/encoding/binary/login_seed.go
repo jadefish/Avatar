@@ -6,10 +6,11 @@ import (
 	"fmt"
 
 	"github.com/jadefish/avatar"
+	"github.com/jadefish/avatar/pkg/crypto"
 )
 
 type LoginSeed struct {
-	Seed    avatar.Seed
+	Seed    crypto.Seed
 	Version avatar.Version
 }
 
@@ -67,7 +68,7 @@ func (cmd *LoginSeed) UnmarshalBinary(order binary.ByteOrder, data []byte) error
 		return err
 	}
 
-	cmd.Seed = avatar.Seed(seed)
+	cmd.Seed = crypto.Seed(seed)
 	cmd.Version = avatar.Version{major, minor, patch, revision}
 
 	return nil
