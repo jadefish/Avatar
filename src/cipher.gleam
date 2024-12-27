@@ -1,3 +1,4 @@
+import gleam/bytes_tree.{type BytesTree}
 import gleam/bool
 import gleam/int
 import gleam/result
@@ -78,17 +79,13 @@ pub fn login(seed: Seed, version: Version) -> Result(Cipher, Error) {
 
   // ((^seed ^ lo_mask1) << 16) | ((seed ^ lo_mask2) & lo_mask3)
   let mask_lo =
-    bnot(value)
-    |> bxor(lo_mask1)
-    |> bsl(16)
+    { bnot(value) |> bxor(lo_mask1) |> bsl(16) }
     |> bor(value |> bxor(lo_mask2) |> band(lo_mask3))
     |> uint32()
 
   // ((seed ^ hi_mask1) >> 16) | ((^seed ^ hi_mask2) & hi_mask3)
   let mask_hi =
-    value
-    |> bxor(hi_mask1)
-    |> bsr(16)
+    { value |> bxor(hi_mask1) |> bsr(16) }
     |> bor(bnot(value) |> bxor(hi_mask2) |> band(hi_mask3))
     |> uint32()
 
@@ -101,16 +98,24 @@ pub fn nil() -> Cipher {
   NilCipher
 }
 
+pub type PlainText {
+  PlainText(bits: BitArray)
+}
+
+pub type CipherText {
+  CipherText(bits: BitArray)
+}
+
 /// Encrypt data using the provided cipher.
 ///
 /// Encryption utilizes a rolling cipher on both ends, so a new Cipher is
 /// returned along with the decrypted data. The old Cipher will no longer be
 /// capable of encrypting data, so it should be discarded.
-pub fn encrypt(cipher: Cipher, plain data: BitArray) -> #(Cipher, BitArray) {
+pub fn encrypt(cipher: Cipher, plaintext: PlainText) -> #(Cipher, CipherText) {
   case cipher {
-    NilCipher -> #(cipher, data)
+    NilCipher -> #(cipher, CipherText(plaintext.bits))
     // The Login cipher doesn't support encrypting data.
-    LoginCipher(_, _, _) -> #(cipher, data)
+    LoginCipher(_, _, _) -> #(cipher, CipherText(plaintext.bits))
   }
 }
 
@@ -119,24 +124,28 @@ pub fn encrypt(cipher: Cipher, plain data: BitArray) -> #(Cipher, BitArray) {
 /// Decryption utilizes a rolling cipher on both ends, so a new Cipher is
 /// returned along with the decrypted data. The old Cipher will no longer be
 /// capable of decrypting data, so it should be discarded.
-pub fn decrypt(cipher: Cipher, data: BitArray) -> #(Cipher, BitArray) {
+pub fn decrypt(cipher: Cipher, ciphertext: CipherText) -> #(Cipher, PlainText) {
   case cipher {
-    NilCipher -> #(cipher, data)
+    NilCipher -> #(cipher, PlainText(ciphertext.bits))
     LoginCipher(seed, mask, key) -> {
-      let #(data, new_mask, new_key) = login_decrypt_loop(mask, key, data, <<>>)
-      #(LoginCipher(seed, new_mask, new_key), data)
+      let #(plaintext_bytes, new_mask, new_key) = login_decrypt_loop(mask, key, ciphertext.bits, bytes_tree.new())
+      #(
+        LoginCipher(seed, new_mask, new_key),
+        PlainText(bytes_tree.to_bit_array(plaintext_bytes))
+      )
     }
   }
 }
 
 fn login_decrypt_loop(
-  mask mask: KeyPair,
-  key key: KeyPair,
-  cipher cipher_bits: BitArray,
-  plain plain_bits: BitArray,
-) -> #(BitArray, KeyPair, KeyPair) {
-  case cipher_bits {
-    <<byte, remaining:bytes>> -> {
+  mask: KeyPair,
+  key: KeyPair,
+  ciphertext: BitArray,
+  plaintext: BytesTree,
+) -> #(BytesTree, KeyPair, KeyPair) {
+  case ciphertext {
+    <<>> -> #(plaintext, mask, key)
+    <<byte:8, remaining_bytes:bytes>> -> {
       // dst[i] = src[i] ^ byte(cs.maskLo)
       let plain_byte = band(mask.lo, 0xFF) |> bxor(byte)
 
@@ -158,12 +167,12 @@ fn login_decrypt_loop(
         |> bxor(key.hi)
         |> uint32()
 
-      let mask = KeyPair(new_mask_lo, new_mask_hi)
-      let derp = <<plain_bits:bits, plain_byte>>
+      let new_mask = KeyPair(new_mask_lo, new_mask_hi)
+      let decrypted_bytes = bytes_tree.append(plaintext, <<plain_byte>>)
 
-      login_decrypt_loop(mask, key, remaining, derp)
+      login_decrypt_loop(new_mask, key, remaining_bytes, decrypted_bytes)
     }
-    <<>> | _ -> #(plain_bits, mask, key)
+    _ -> todo as "is this reachable?"
   }
 }
 
