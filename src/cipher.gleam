@@ -1,7 +1,6 @@
-import gleam/bytes_tree.{type BytesTree}
 import gleam/bool
+import gleam/bytes_tree.{type BytesTree}
 import gleam/int
-import gleam/result
 
 const lo_mask1 = 0x00001357
 
@@ -37,7 +36,7 @@ pub opaque type Seed {
   Seed(value: Int)
 }
 
-pub fn new_seed(value: Int) -> Result(Seed, Error) {
+pub fn seed(value: Int) -> Result(Seed, Error) {
   use <- bool.guard(when: value <= 0, return: Error(InvalidSeed))
 
   Ok(Seed(value))
@@ -47,7 +46,7 @@ pub opaque type Version {
   Version(major: Int, minor: Int, patch: Int, revision: Int)
 }
 
-pub fn new_version(
+pub fn version(
   major: Int,
   minor: Int,
   patch: Int,
@@ -71,10 +70,10 @@ fn uint32(int: Int) -> Int {
   band(int, 0xFFFFFFFF)
 }
 
-/// Create a new login chiper, capable of working with client packets during
-/// authentication against a login server.
-pub fn login(seed: Seed, version: Version) -> Result(Cipher, Error) {
-  use key <- result.map(key_for_version(version))
+/// Create a new login chiper, capable of decrypting packets sent during a
+/// client's authentication against a login server.
+pub fn login(seed: Seed, version: Version) -> Cipher {
+  let key = key_for_version(version)
   let value = seed.value
 
   // ((^seed ^ lo_mask1) << 16) | ((seed ^ lo_mask2) & lo_mask3)
@@ -128,10 +127,11 @@ pub fn decrypt(cipher: Cipher, ciphertext: CipherText) -> #(Cipher, PlainText) {
   case cipher {
     NilCipher -> #(cipher, PlainText(ciphertext.bits))
     LoginCipher(seed, mask, key) -> {
-      let #(plaintext_bytes, new_mask, new_key) = login_decrypt_loop(mask, key, ciphertext.bits, bytes_tree.new())
+      let #(plaintext_bytes, new_mask, new_key) =
+        login_decrypt_loop(mask, key, ciphertext.bits, bytes_tree.new())
       #(
         LoginCipher(seed, new_mask, new_key),
-        PlainText(bytes_tree.to_bit_array(plaintext_bytes))
+        PlainText(bytes_tree.to_bit_array(plaintext_bytes)),
       )
     }
   }
@@ -172,7 +172,8 @@ fn login_decrypt_loop(
 
       login_decrypt_loop(new_mask, key, remaining_bytes, decrypted_bytes)
     }
-    _ -> todo as "is this reachable?"
+    _ -> panic as "is this reachable?"
+    // TODO
   }
 }
 
@@ -217,13 +218,13 @@ fn compute_key(a: Int, b: Int, c: Int) -> #(Int, Int, Int) {
   #(key1, key2, key3)
 }
 
-fn key_for_version(version: Version) -> Result(KeyPair, Error) {
+fn key_for_version(version: Version) -> KeyPair {
   case version {
     // 2.0.3.x is a special case.
-    Version(2, 0, 3, 0x78) -> Ok(KeyPair(0x2D13A5FD, 0xA39D527F))
+    Version(2, 0, 3, 0x78) -> KeyPair(0x2D13A5FD, 0xA39D527F)
     Version(major, minor, patch, _) -> {
       let #(_, hi, lo) = compute_key(major, minor, patch)
-      Ok(KeyPair(lo, hi))
+      KeyPair(lo, hi)
     }
   }
 }
