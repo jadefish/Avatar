@@ -1,5 +1,6 @@
 import cipher
 import client.{type Client}
+import error
 import gleam/bit_array
 import gleam/erlang/process.{type Subject}
 import gleam/int
@@ -9,9 +10,7 @@ import gleam/otp/actor
 import gleam/result
 import gleam/string
 import glisten
-import glisten/socket
 import glisten/tcp
-import packets
 import packets/game_server_list
 import packets/login_request
 import packets/login_seed
@@ -26,21 +25,8 @@ pub opaque type Server {
   StartedServer(parent: Subject(LoginResult), server: glisten.Server)
 }
 
-pub type Error {
-  NetError(socket.SocketReason)
-  PacketError(packets.Error)
-}
-
 pub type LoginResult =
-  Result(Client, AuthenticationError)
-
-pub type AuthenticationError {
-  InvalidCredentals
-  AccountInUse
-  AccountBanned
-
-  Incomplete(error: Error)
-}
+  Result(Client, error.AuthenticationError)
 
 pub opaque type Action {
   Start
@@ -118,70 +104,72 @@ fn message_handler(message, server: Server, conn) {
   // assertion is safe.
   let assert glisten.Packet(bits) = message
 
+  // TODO: Reconsider this design. Currently, there are two ways to read data
+  // from a client: glisten's message handler (this function) and the
+  // client.read function.
+  //
+  // Since login server packets are strictly ordered, a design wherein glisten
+  // simply pushes read data into an inbox isn't ideal. It could work, if an
+  // internal "authentication step" state variable is maintained for each
+  // client, but both the current design and this feel awkward to use.
+  //
+  // Occasionally, a client will send the 0xD9 Spy On Client packet during
+  // login, which implies that login server packets were meant to be handled
+  // out-of-order, anyway.
+
   let result = case bits {
     <<0xEF, _:bits>> -> {
+      // TODO: a client sending 0xD9 Spy On Client will break this process.
       let client = client.Client(conn, bits, <<>>, cipher.nil())
       use client <- result.try(handle_login_seed(client))
       use client <- result.try(handle_login_request(client))
       use client <- result.try(send_game_server_list(client, game_servers))
+
       Ok(client)
     }
 
     bits -> {
       io.println("login_server: bad packet: " <> bit_array.inspect(bits))
-      let _ = tcp.close(conn)
-      // TODO: need to handle error?
-      Error(NetError(socket.Closed))
+      use _ <- u.try_map(tcp.close(conn), error.WriteError)
+      Error(error.UnexpectedPacket)
     }
   }
 
   case result {
     Ok(client) -> actor.send(server.parent, Ok(client))
-    Error(error) -> actor.send(server.parent, Error(Incomplete(error)))
+
+    // TODO: get login failure reason from login process, above
+    Error(error) -> actor.send(server.parent, Error(error.InvalidCredentals))
   }
 
   actor.continue(server)
 }
 
-fn client_error_to_net_error(error: client.Error) {
-  // TODO: this is gross
-  case error {
-    client.ReadError(reason) -> NetError(reason)
-    // TODO: this isn't right
-    _ -> NetError(socket.Closed)
-  }
-}
-
-fn handle_login_seed(client: Client) {
+fn handle_login_seed(client: Client) -> Result(Client, error.Error) {
   // Receive 0xEF Login Seed (unencrypted, length 21):
-  use #(client, bits) <- u.try_map(
-    client.read(client, 21),
-    client_error_to_net_error,
-  )
-  use login_seed <- u.try_map(login_seed.decode(bits), PacketError)
-  io.debug(login_seed)
+  use #(client, bits) <- result.try(client.read(client, 21))
+  let #(cipher, plaintext) = cipher.decrypt(client.cipher, bits)
+  use login_seed <- result.try(login_seed.decode(plaintext))
   let cipher = cipher.login(login_seed.seed, login_seed.version)
+
+  io.debug(login_seed)
+
   Ok(client.Client(..client, cipher:))
 }
 
 fn handle_login_request(client: Client) {
   // Receive 0x80 Login Request (encrypted, length 62):
-  use #(client, bits) <- u.try_map(
-    client.read(client, 62),
-    client_error_to_net_error,
-  )
-  let #(cipher, plaintext) =
-    cipher.decrypt(client.cipher, cipher.CipherText(bits))
-  use login_request <- u.try_map(
-    login_request.decode(plaintext.bits),
-    PacketError,
-  )
-  io.debug(login_request)
+  use #(client, bits) <- result.try(client.read(client, 62))
+  let #(cipher, plaintext) = cipher.decrypt(client.cipher, bits)
+  use login_request <- result.try(login_request.decode(plaintext))
 
-  // TODO: authenticate the client.
+  // TODO: Authenticate the client:
   // 1. credential match
-  // 2. IP-in-use check
-  // 3. ban check
+  // 2. ban check
+  // 3. account-in-use check
+
+  // TODO: The password should be masked when printed here.
+  io.debug(login_request)
 
   Ok(client.Client(..client, cipher:))
 }
@@ -193,7 +181,11 @@ fn send_game_server_list(
   // Send 0xA8 Game Server List (unencrypted, variable length):
   let game_server_list = game_server_list.GameServerList(game_servers)
   io.debug(game_server_list)
-  use bytes <- u.try_map(game_server_list.encode(game_server_list), PacketError)
+  use plaintext <- result.try(game_server_list.encode(game_server_list))
 
-  client.write(client, bytes) |> result.map_error(client_error_to_net_error)
+  // TODO: This is a bit clunky. I didn't expect the Game Server List to be
+  // sent unencrypted.
+  let #(_, ciphertext) = cipher.encrypt(cipher.nil(), plaintext)
+
+  client.write(client, ciphertext)
 }

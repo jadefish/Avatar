@@ -1,10 +1,11 @@
-import gleam/bytes_tree.{type BytesTree}
+import cipher
+import error
+import gleam/bytes_tree
 import gleam/int
 import gleam/list
 import gleam/result
 import gleam/string
 import ipv4.{type IPv4}
-import packets
 import time_zone.{type TimeZone}
 
 pub type GameServerList {
@@ -16,7 +17,7 @@ const system_info_flag = 0xCC
 
 pub fn encode(
   game_server_list: GameServerList,
-) -> Result(BytesTree, packets.Error) {
+) -> Result(cipher.PlainText, error.Error) {
   let GameServerList(servers) = game_server_list
   let count = list.length(servers)
   let server_list =
@@ -29,6 +30,8 @@ pub fn encode(
 
   bytes_tree.from_bit_array(<<0xA8, length:16, system_info_flag:8, count:16>>)
   |> bytes_tree.append_tree(server_list)
+  |> bytes_tree.to_bit_array()
+  |> cipher.PlainText
   |> Ok
 }
 

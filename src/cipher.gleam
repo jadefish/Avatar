@@ -1,3 +1,4 @@
+import error
 import gleam/bool
 import gleam/bytes_tree.{type BytesTree}
 import gleam/int
@@ -27,17 +28,12 @@ const bsl = int.bitwise_shift_left
 
 const bsr = int.bitwise_shift_right
 
-pub type Error {
-  InvalidSeed
-  UnsupportedVersion
-}
-
 pub opaque type Seed {
   Seed(value: Int)
 }
 
-pub fn seed(value: Int) -> Result(Seed, Error) {
-  use <- bool.guard(when: value <= 0, return: Error(InvalidSeed))
+pub fn seed(value: Int) -> Result(Seed, error.Error) {
+  use <- bool.guard(when: value <= 0, return: Error(error.InvalidSeed))
 
   Ok(Seed(value))
 }
@@ -51,11 +47,11 @@ pub fn version(
   minor: Int,
   patch: Int,
   revision: Int,
-) -> Result(Version, Error) {
-  use <- bool.guard(major < 1, return: Error(UnsupportedVersion))
-  use <- bool.guard(minor < 0, return: Error(UnsupportedVersion))
-  use <- bool.guard(patch < 0, return: Error(UnsupportedVersion))
-  use <- bool.guard(revision < 0, return: Error(UnsupportedVersion))
+) -> Result(Version, error.Error) {
+  use <- bool.guard(major < 1, return: Error(error.UnsupportedVersion))
+  use <- bool.guard(minor < 0, return: Error(error.UnsupportedVersion))
+  use <- bool.guard(patch < 0, return: Error(error.UnsupportedVersion))
+  use <- bool.guard(revision < 0, return: Error(error.UnsupportedVersion))
 
   Ok(Version(major, minor, patch, revision))
 }

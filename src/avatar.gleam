@@ -1,6 +1,7 @@
 import gleam/erlang/process
 import gleam/int
 import gleam/io
+import gleam/string
 import login_server
 
 // TODO: Make this configurable. The defaults in UO's login.cfg specify 4 login
@@ -18,8 +19,17 @@ pub fn main() {
   print_auth_result(subject)
 }
 
-fn print_auth_result(subject) {
-  process.receive_forever(subject) |> io.debug
+fn print_auth_result(subject: process.Subject(login_server.LoginResult)) {
+  case process.receive_forever(subject) {
+    Ok(client) ->
+      io.println(
+        "Successfully authenticated client: " <> string.inspect(client),
+      )
+    Error(error) -> {
+      // TODO: Probably need a reference to the errant Client in here.
+      io.println("Auth error: " <> string.inspect(error))
+    }
+  }
 
   print_auth_result(subject)
 }

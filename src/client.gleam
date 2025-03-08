@@ -1,6 +1,7 @@
 import cipher.{type Cipher}
+import error
 import gleam/bit_array
-import gleam/bytes_tree.{type BytesTree}
+import gleam/bytes_tree
 import gleam/erlang
 import gleam/erlang/process
 import gleam/int
@@ -9,9 +10,6 @@ import gleam/result
 import glisten
 import glisten/socket
 import glisten/tcp
-import packets/game_server_list
-import packets/login_request
-import packets/login_seed
 import utils as u
 
 pub const max_packet_size = 0xF000
@@ -66,19 +64,6 @@ pub const max_packet_size = 0xF000
 
 //   Ok(Client(..new_client, state: Relayed))
 // }
-
-pub type Error {
-  ReadError(reason: socket.SocketReason)
-  WriteError(reason: socket.SocketReason)
-
-  NoData
-  DecodeError
-  EncodeError
-  UnsupportedPacket(cmd: Int)
-
-  CryptoError(cipher.Error)
-}
-
 type Connection =
   glisten.Connection(BitArray)
 
@@ -164,7 +149,10 @@ fn socket_read(client: Client) -> Result(Client, socket.SocketReason) {
   Ok(Client(..client, inbox:))
 }
 
-pub fn read(client: Client, size: Int) -> Result(#(Client, BitArray), Error) {
+pub fn read(
+  client: Client,
+  size: Int,
+) -> Result(#(Client, cipher.CipherText), error.Error) {
   let size = case size {
     n if n < 0 -> 0
     n if n > max_packet_size -> max_packet_size
@@ -177,20 +165,20 @@ pub fn read(client: Client, size: Int) -> Result(#(Client, BitArray), Error) {
   io.println(inspect(client) <> ": read: want " <> wanted <> ", have " <> have)
 
   case size {
-    0 -> Ok(#(client, <<>>))
+    0 -> Ok(#(client, cipher.CipherText(<<>>)))
 
     n if n <= inbox_size -> {
       io.println(inspect(client) <> ": read: pulling from inbox")
       let assert <<bits:bytes-size(n), rest:bytes>> = client.inbox
       let new_client = Client(..client, inbox: rest)
-      Ok(#(new_client, bits))
+      Ok(#(new_client, cipher.CipherText(bits)))
     }
 
     n if n > inbox_size -> {
       io.println(inspect(client) <> ": read: reading from socket")
       case socket_read(client) {
         Ok(new_client) -> read(new_client, size)
-        Error(reason) -> Error(ReadError(reason))
+        Error(reason) -> Error(error.ReadError(reason))
       }
     }
 
@@ -202,7 +190,11 @@ pub fn read(client: Client, size: Int) -> Result(#(Client, BitArray), Error) {
   }
 }
 
-pub fn write(client: Client, bytes: BytesTree) -> Result(Client, Error) {
-  use _ <- u.try_map(tcp.send(client.conn.socket, bytes), WriteError)
+pub fn write(
+  client: Client,
+  cipher_text: cipher.CipherText,
+) -> Result(Client, error.Error) {
+  let bits = bytes_tree.from_bit_array(cipher_text.bits)
+  use _ <- u.try_map(tcp.send(client.conn.socket, bits), error.WriteError)
   Ok(client)
 }
