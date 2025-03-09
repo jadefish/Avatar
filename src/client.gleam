@@ -14,25 +14,6 @@ import utils as u
 
 pub const max_packet_size = 0xF000
 
-// /// Encode a packet to a byte tree.
-// fn encode_packet(packet: Packet) -> BytesTree {
-//   let bytes = case packet {
-//     ConnectToGameServer(game_server) -> {
-//       bytes_tree.new()
-//       |> bytes_tree.append(<<
-//         0x8C,
-//         reversed_ip(game_server.ip):32,
-//         game_server.port:16,
-//         0:32,
-//       >>)
-//     }
-//   }
-
-//   io.println(bit_array.inspect(bytes_tree.to_bit_array(bytes)))
-
-//   bytes
-// }
-
 // fn handle_select_server(client: Client) -> Result(Client, ClientError) {
 //   io.println(inspect_socket(client) <> ": waiting on server selection")
 //   // TODO: this will hang if client has sent 0xD9 Client Info
@@ -59,7 +40,7 @@ pub const max_packet_size = 0xF000
 //   io.println(inspect_socket(client) <> ": relaying to " <> server.name)
 
 //   let packet = ConnectToGameServer(server)
-//   let data = PlainText(encode_packet(packet) |> bytes_tree.to_bit_array)
+//   let data = Plaintext(encode_packet(packet) |> bytes_tree.to_bit_array)
 //   let assert Ok(new_client) = write(client, data)
 
 //   Ok(Client(..new_client, state: Relayed))
@@ -74,58 +55,6 @@ pub type Client {
 pub fn new(conn: Connection) {
   Client(conn, <<>>, <<>>, cipher.nil())
 }
-
-// pub opaque type Message {
-//   Start
-//   Stop
-
-//   PushToInbox(data: BitArray)
-
-//   Authenticate(reply_with: Subject(Result(Nil, Error)))
-// }
-
-// fn handle_message(
-//   message: Message,
-//   client: Client,
-// ) -> actor.Next(Message, Client) {
-//   case message {
-//     Start -> {
-//       // TODO
-//       actor.continue(client)
-//     }
-
-//     Authenticate(reply_with) -> {
-//       let result = {
-//         use client <- result.try(handle_login_seed(client))
-//         use client <- result.try(handle_login_request(client))
-//         use client <- result.try(send_game_server_list(client, game_servers))
-//         Ok(client)
-//       }
-
-//       case result {
-//         Ok(client) -> {
-//           actor.send(reply_with, Ok(Nil))
-//           actor.continue(client)
-//         }
-
-//         Error(error) -> {
-//           actor.send(reply_with, Error(error))
-//           actor.Stop(process.Abnormal(string.inspect(error)))
-//         }
-//       }
-//     }
-
-//     Stop -> actor.Stop(process.Normal)
-
-//     PushToInbox(data) -> {
-//       let inbox = bit_array.append(client.inbox, data)
-//       let n = int.to_string(bit_array.byte_size(data))
-//       io.println(inspect(client) <> ": pushing " <> n <> " bytes to inbox")
-//       io.debug(inbox)
-//       actor.continue(Client(..client, inbox:))
-//     }
-//   }
-// }
 
 fn socket_string(client: Client) -> String {
   glisten.get_client_info(client.conn)
@@ -152,7 +81,7 @@ fn socket_read(client: Client) -> Result(Client, socket.SocketReason) {
 pub fn read(
   client: Client,
   size: Int,
-) -> Result(#(Client, cipher.CipherText), error.Error) {
+) -> Result(#(Client, cipher.Ciphertext), error.Error) {
   let size = case size {
     n if n < 0 -> 0
     n if n > max_packet_size -> max_packet_size
@@ -165,13 +94,13 @@ pub fn read(
   io.println(inspect(client) <> ": read: want " <> wanted <> ", have " <> have)
 
   case size {
-    0 -> Ok(#(client, cipher.CipherText(<<>>)))
+    0 -> Ok(#(client, cipher.Ciphertext(<<>>)))
 
     n if n <= inbox_size -> {
       io.println(inspect(client) <> ": read: pulling from inbox")
       let assert <<bits:bytes-size(n), rest:bytes>> = client.inbox
       let new_client = Client(..client, inbox: rest)
-      Ok(#(new_client, cipher.CipherText(bits)))
+      Ok(#(new_client, cipher.Ciphertext(bits)))
     }
 
     n if n > inbox_size -> {
@@ -182,19 +111,15 @@ pub fn read(
       }
     }
 
-    // TODO: is this reachable?
-    _ ->
-      panic as {
-        inspect(client) <> ": read: inbox_size panic (" <> have <> ")"
-      }
+    _ -> panic as "client.read: unreachable case"
   }
 }
 
 pub fn write(
   client: Client,
-  cipher_text: cipher.CipherText,
+  ciphertext: cipher.Ciphertext,
 ) -> Result(Client, error.Error) {
-  let bits = bytes_tree.from_bit_array(cipher_text.bits)
-  use _ <- u.try_map(tcp.send(client.conn.socket, bits), error.WriteError)
+  let bytes = bytes_tree.from_bit_array(ciphertext.bits)
+  use _ <- u.try_map(tcp.send(client.conn.socket, bytes), error.WriteError)
   Ok(client)
 }

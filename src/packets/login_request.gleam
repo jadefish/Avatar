@@ -10,7 +10,7 @@ pub type LoginRequest {
   LoginRequest(account: String, password: String, next_key: Int)
 }
 
-pub fn decode(data: cipher.PlainText) -> Result(LoginRequest, error.Error) {
+pub fn decode(data: cipher.Plaintext) -> Result(LoginRequest, error.Error) {
   case data.bits {
     <<0x80, account:30-bytes, password:30-bytes, next_key:int>> -> {
       use account <- u.try_replace(
@@ -24,6 +24,7 @@ pub fn decode(data: cipher.PlainText) -> Result(LoginRequest, error.Error) {
 
       Ok(LoginRequest(account, password, next_key))
     }
+
     _ -> Error(error.DecodeError)
   }
 }

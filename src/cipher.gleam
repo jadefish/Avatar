@@ -93,12 +93,12 @@ pub fn nil() -> Cipher {
   NilCipher
 }
 
-pub type PlainText {
-  PlainText(bits: BitArray)
+pub type Plaintext {
+  Plaintext(bits: BitArray)
 }
 
-pub type CipherText {
-  CipherText(bits: BitArray)
+pub type Ciphertext {
+  Ciphertext(bits: BitArray)
 }
 
 /// Encrypt data using the provided cipher.
@@ -106,11 +106,11 @@ pub type CipherText {
 /// Encryption utilizes a rolling cipher on both ends, so a new Cipher is
 /// returned along with the decrypted data. The old Cipher will no longer be
 /// capable of encrypting data, so it should be discarded.
-pub fn encrypt(cipher: Cipher, plaintext: PlainText) -> #(Cipher, CipherText) {
+pub fn encrypt(cipher: Cipher, plaintext: Plaintext) -> #(Cipher, Ciphertext) {
   case cipher {
-    NilCipher -> #(cipher, CipherText(plaintext.bits))
+    NilCipher -> #(cipher, Ciphertext(plaintext.bits))
     // The Login cipher doesn't support encrypting data.
-    LoginCipher(_, _, _) -> #(cipher, CipherText(plaintext.bits))
+    LoginCipher(_, _, _) -> #(cipher, Ciphertext(plaintext.bits))
   }
 }
 
@@ -119,15 +119,15 @@ pub fn encrypt(cipher: Cipher, plaintext: PlainText) -> #(Cipher, CipherText) {
 /// Decryption utilizes a rolling cipher on both ends, so a new Cipher is
 /// returned along with the decrypted data. The old Cipher will no longer be
 /// capable of decrypting data, so it should be discarded.
-pub fn decrypt(cipher: Cipher, ciphertext: CipherText) -> #(Cipher, PlainText) {
+pub fn decrypt(cipher: Cipher, ciphertext: Ciphertext) -> #(Cipher, Plaintext) {
   case cipher {
-    NilCipher -> #(cipher, PlainText(ciphertext.bits))
+    NilCipher -> #(cipher, Plaintext(ciphertext.bits))
     LoginCipher(seed, mask, key) -> {
       let #(plaintext_bytes, new_mask, new_key) =
         login_decrypt_loop(mask, key, ciphertext.bits, bytes_tree.new())
       #(
         LoginCipher(seed, new_mask, new_key),
-        PlainText(bytes_tree.to_bit_array(plaintext_bytes)),
+        Plaintext(bytes_tree.to_bit_array(plaintext_bytes)),
       )
     }
   }
@@ -141,6 +141,7 @@ fn login_decrypt_loop(
 ) -> #(BytesTree, KeyPair, KeyPair) {
   case ciphertext {
     <<>> -> #(plaintext, mask, key)
+
     <<byte:8, remaining_bytes:bytes>> -> {
       // dst[i] = src[i] ^ byte(cs.maskLo)
       let plain_byte = band(mask.lo, 0xFF) |> bxor(byte)
@@ -168,8 +169,8 @@ fn login_decrypt_loop(
 
       login_decrypt_loop(new_mask, key, remaining_bytes, decrypted_bytes)
     }
-    _ -> panic as "is this reachable?"
-    // TODO
+
+    _ -> panic as "cipher.login_decrypt_loop: found unaligned bit array"
   }
 }
 

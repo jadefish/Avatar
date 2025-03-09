@@ -25,13 +25,12 @@ pub fn login_decrypt_test() {
   let assert Ok(seed) = cipher.seed(seed)
   let assert Ok(version) = cipher.version(7, 0, 106, 21)
   let ciphertext =
-    <<
+    cipher.Ciphertext(<<
       22, 85, 134, 110, 22, 182, 112, 132, 182, 142, 146, 155, 168, 43, 234, 138,
       186, 34, 238, 8, 251, 130, 62, 96, 207, 24, 115, 70, 220, 145, 55, 148,
       108, 138, 240, 201, 79, 29, 172, 42, 192, 181, 136, 33, 111, 72, 91, 210,
       150, 52, 229, 13, 121, 195, 30, 240, 135, 188, 161, 175, 168, 43,
-    >>
-    |> cipher.CipherText()
+    >>)
   let cipher = cipher.login(seed, version)
   let #(_cipher, plaintext) = cipher.decrypt(cipher, ciphertext)
   let assert <<

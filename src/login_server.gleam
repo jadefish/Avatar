@@ -16,7 +16,6 @@ import packets/login_denied
 import packets/login_request
 import packets/login_seed
 import time_zone as tz
-import utils as u
 
 /// A login server accepts a port and a parent subject. Once started, the server
 /// authenticates connecting clients. Clients that have been successfully
@@ -50,14 +49,15 @@ pub fn stop(server: Subject(Action)) {
   server
 }
 
-fn connection_addr(conn: glisten.Connection(a)) {
-  glisten.get_client_info(conn)
-  |> result.map(fn(info) {
-    glisten.ip_address_to_string(info.ip_address)
-    <> ":"
-    <> int.to_string(info.port)
-  })
-  |> result.unwrap("(unknown)")
+fn connection_addr(result: Result(glisten.ConnectionInfo, a)) {
+  case result {
+    Ok(info) ->
+      glisten.ip_address_to_string(info.ip_address)
+      <> ":"
+      <> int.to_string(info.port)
+
+    Error(_) -> "(unknown)"
+  }
 }
 
 fn handle_message(action: Action, server: Server) {
@@ -69,20 +69,25 @@ fn handle_message(action: Action, server: Server) {
 
         StoppedServer(parent, port, pool_size) -> {
           let init = fn(conn) {
-            let addr = connection_addr(conn)
+            let addr = connection_addr(glisten.get_client_info(conn))
             io.println("login_server: new connection: " <> addr)
             #(StoppedServer(parent, port, pool_size), option.None)
           }
 
           let result =
             glisten.handler(init, message_handler)
+            // UO clients don't seem to do IPv6.
+            |> glisten.bind("0.0.0.0")
             |> glisten.with_pool_size(pool_size)
             |> glisten.start_server(port)
 
-          io.println("login_server: listening on port " <> int.to_string(port))
-
           case result {
-            Ok(server) -> actor.continue(StartedServer(parent, server))
+            Ok(server) -> {
+              let addr = connection_addr(glisten.get_server_info(server, 5))
+              io.println("login_server: listening on " <> addr)
+              actor.continue(StartedServer(parent, server))
+            }
+
             Error(error) -> actor.Stop(process.Abnormal(string.inspect(error)))
           }
         }
@@ -131,7 +136,10 @@ fn message_handler(message, server: Server, conn) {
 
     bits -> {
       io.println("login_server: bad packet: " <> bit_array.inspect(bits))
-      use _ <- u.try_map(tcp.close(conn), error.WriteError)
+
+      // It's fine if the connection couldn't be closed.
+      let _ = tcp.close(conn)
+
       Error(error.UnexpectedPacket)
     }
   }
@@ -195,21 +203,20 @@ fn deny_login(
 ) -> Result(Client, error.Error) {
   let packet = login_denied.LoginDenied(reason)
   let plaintext = login_denied.encode(packet)
-  client.write(client, cipher.CipherText(plaintext.bits))
+  client.write(client, cipher.Ciphertext(plaintext.bits))
 }
 
 fn send_game_server_list(
   client: Client,
   game_servers: List(game_server_list.GameServer),
 ) {
-  // Send 0xA8 Game Server List (unencrypted, variable length):
-  let game_server_list = game_server_list.GameServerList(game_servers)
+  let game_server_list =
+    game_server_list.GameServerList(
+      game_servers,
+      game_server_list.DoNotSendSystemInfo,
+    )
   io.debug(game_server_list)
-  use plaintext <- result.try(game_server_list.encode(game_server_list))
 
-  // TODO: This is a bit clunky. I didn't expect the Game Server List to be
-  // sent unencrypted.
-  let #(_, ciphertext) = cipher.encrypt(cipher.nil(), plaintext)
-
-  client.write(client, ciphertext)
+  let plaintext = game_server_list.encode(game_server_list)
+  client.write(client, cipher.Ciphertext(plaintext.bits))
 }

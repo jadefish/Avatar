@@ -1,5 +1,4 @@
 import gleam/erlang/process
-import gleam/int
 import gleam/io
 import gleam/string
 import login_server
@@ -14,7 +13,6 @@ pub fn main() {
   let _login_server =
     login_server.new(subject, port, 10)
     |> login_server.start()
-  io.println("start_login_server(" <> int.to_string(port) <> ")")
 
   print_auth_result(subject)
 }

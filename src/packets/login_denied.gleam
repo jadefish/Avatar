@@ -44,9 +44,9 @@ pub type Reason {
   GeneralIGRAuthenticationFailure
 }
 
-pub fn encode(packet: LoginDenied) -> cipher.PlainText {
+pub fn encode(packet: LoginDenied) -> cipher.Plaintext {
   let reason_byte = encode_reason(packet.reason)
-  cipher.PlainText(<<0x82, reason_byte:8>>)
+  cipher.Plaintext(<<0x82, reason_byte:8>>)
 }
 
 fn encode_reason(reason: Reason) -> Int {

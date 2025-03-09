@@ -11,7 +11,7 @@ pub type LoginSeed {
   LoginSeed(seed: cipher.Seed, version: cipher.Version)
 }
 
-pub fn decode(data: cipher.PlainText) -> Result(LoginSeed, error.Error) {
+pub fn decode(data: cipher.Plaintext) -> Result(LoginSeed, error.Error) {
   case data.bits {
     <<0xEF, seed:32, major:32, minor:32, patch:32, revision:32>> -> {
       use seed <- result.try(cipher.seed(seed))
