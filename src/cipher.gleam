@@ -28,6 +28,9 @@ const bsl = int.bitwise_shift_left
 
 const bsr = int.bitwise_shift_right
 
+// TODO: Opaque Seed is becoming clunky to use. It's nice to have "non-negative
+// integer" enforced by the constructor function, but is it worth the hassle?
+
 pub opaque type Seed {
   Seed(value: Int)
 }
@@ -36,6 +39,10 @@ pub fn seed(value: Int) -> Result(Seed, error.Error) {
   use <- bool.guard(when: value <= 0, return: Error(error.InvalidSeed))
 
   Ok(Seed(value))
+}
+
+pub fn seed_value(seed: Seed) -> Int {
+  seed.value
 }
 
 pub opaque type Version {

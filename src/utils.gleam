@@ -1,4 +1,6 @@
+import gleam/int
 import gleam/result
+import glisten
 
 /// Remove all NUL bytes from the provided bit array.
 pub fn trim_nul(bits: BitArray) -> BitArray {
@@ -60,4 +62,24 @@ pub fn try_map(
   apply fun: fn(a) -> Result(c, f),
 ) -> Result(c, f) {
   result.try(result |> result.map_error(mapping), fun)
+}
+
+/// Returns a string address for a glisten connection (client or server) in the
+/// format `ip:port`.
+///
+/// ## Examples
+/// ```gleam
+/// connection_addr(glisten.get_client_info(some_conn))
+/// // "127.0.0.1:51484"
+///
+/// connection_addr(glisten.get_server_info(some_server))
+/// // "127.0.0.1:7775"
+/// ```
+pub fn connection_addr(result: Result(glisten.ConnectionInfo, e)) {
+  case result {
+    Ok(glisten.ConnectionInfo(port, ip)) ->
+      glisten.ip_address_to_string(ip) <> ":" <> int.to_string(port)
+
+    Error(_) -> "(unknown)"
+  }
 }

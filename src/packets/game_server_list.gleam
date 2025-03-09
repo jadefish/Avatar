@@ -44,6 +44,7 @@ pub fn encode(servers: GameServerList) -> cipher.Plaintext {
 
 fn encode_time_zone(time_zone: TimeZone) -> Int {
   // Client expects offset from UTC, in hours, as a single byte.
+  // TODO: In what form does the client expect to receive negative offsets?
   let seconds = time_zone.offset_in_seconds(time_zone) |> result.unwrap(0)
   seconds / 60 / 60
 }
@@ -56,22 +57,26 @@ fn encode_system_info_flag(flag: SystemInfoFlag) -> Int {
   }
 }
 
+fn encode_ip(ip: IPv4) -> Int {
+  int.bitwise_shift_left(ip.0, 24)
+  |> int.bitwise_or(int.bitwise_shift_left(ip.1, 16))
+  |> int.bitwise_or(int.bitwise_shift_left(ip.2, 8))
+  |> int.bitwise_or(ip.3)
+}
+
 fn encode_game_server(game_server: GameServer) -> bytes_tree.BytesTree {
+  let GameServer(name, tz, ip, _port) = game_server
+
   // Server name must be exactly 32 bytes (padded with null bytes).
-  let name =
-    game_server.name
+  let name_bytes =
+    name
     |> string.pad_end(32, "\u{0000}")
     |> string.slice(0, 32)
-  let ip_bytes =
-    int.bitwise_shift_left(game_server.ip.0, 24)
-    |> int.bitwise_or(int.bitwise_shift_left(game_server.ip.1, 16))
-    |> int.bitwise_or(int.bitwise_shift_left(game_server.ip.2, 8))
-    |> int.bitwise_or(game_server.ip.3)
 
   bytes_tree.new()
-  |> bytes_tree.append_string(name)
+  |> bytes_tree.append_string(name_bytes)
   // TODO: percent full
   |> bytes_tree.append(<<0:8>>)
-  |> bytes_tree.append(<<encode_time_zone(game_server.time_zone)>>)
-  |> bytes_tree.append(<<ip_bytes:32-little>>)
+  |> bytes_tree.append(<<encode_time_zone(tz):8>>)
+  |> bytes_tree.append(<<encode_ip(ip):little-32>>)
 }
