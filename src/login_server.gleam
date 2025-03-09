@@ -12,6 +12,7 @@ import gleam/string
 import glisten
 import glisten/tcp
 import packets/game_server_list
+import packets/login_denied
 import packets/login_request
 import packets/login_seed
 import time_zone as tz
@@ -26,7 +27,7 @@ pub opaque type Server {
 }
 
 pub type LoginResult =
-  Result(Client, error.AuthenticationError)
+  Result(Client, error.Error)
 
 pub opaque type Action {
   Start
@@ -117,10 +118,10 @@ fn message_handler(message, server: Server, conn) {
   // login, which implies that login server packets were meant to be handled
   // out-of-order, anyway.
 
+  let client = client.Client(conn, bits, <<>>, cipher.nil())
   let result = case bits {
     <<0xEF, _:bits>> -> {
       // TODO: a client sending 0xD9 Spy On Client will break this process.
-      let client = client.Client(conn, bits, <<>>, cipher.nil())
       use client <- result.try(handle_login_seed(client))
       use client <- result.try(handle_login_request(client))
       use client <- result.try(send_game_server_list(client, game_servers))
@@ -138,8 +139,22 @@ fn message_handler(message, server: Server, conn) {
   case result {
     Ok(client) -> actor.send(server.parent, Ok(client))
 
-    // TODO: get login failure reason from login process, above
-    Error(error) -> actor.send(server.parent, Error(error.InvalidCredentals))
+    Error(error) ->
+      case error {
+        error.AuthenticationError(auth_error) -> {
+          let _ = case auth_error {
+            error.AccountBanned ->
+              deny_login(client, login_denied.AccountBanned)
+            error.AccountInUse -> deny_login(client, login_denied.AccountInUse)
+            error.InvalidCredentals ->
+              deny_login(client, login_denied.InvalidCredentials)
+          }
+
+          actor.send(server.parent, result)
+        }
+
+        _ -> actor.send(server.parent, result)
+      }
   }
 
   actor.continue(server)
@@ -172,6 +187,15 @@ fn handle_login_request(client: Client) {
   io.debug(login_request)
 
   Ok(client.Client(..client, cipher:))
+}
+
+fn deny_login(
+  client: Client,
+  reason: login_denied.Reason,
+) -> Result(Client, error.Error) {
+  let packet = login_denied.LoginDenied(reason)
+  let plaintext = login_denied.encode(packet)
+  client.write(client, cipher.CipherText(plaintext.bits))
 }
 
 fn send_game_server_list(
