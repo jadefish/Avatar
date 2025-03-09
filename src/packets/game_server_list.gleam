@@ -44,6 +44,7 @@ pub fn encode(servers: GameServerList) -> cipher.Plaintext {
 
 fn encode_time_zone(time_zone: TimeZone) -> Int {
   // Client expects offset from UTC, in hours, as a single byte.
+  // TODO: In what form does the client expect to receive negative offsets?
   let seconds = time_zone.offset_in_seconds(time_zone) |> result.unwrap(0)
   seconds / 60 / 60
 }

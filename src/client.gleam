@@ -2,10 +2,9 @@ import cipher.{type Cipher}
 import error
 import gleam/bit_array
 import gleam/bytes_tree
-import gleam/erlang
-import gleam/erlang/process
 import gleam/int
 import gleam/io
+import gleam/option.{type Option, None}
 import gleam/result
 import glisten
 import glisten/socket
@@ -14,65 +13,29 @@ import utils as u
 
 pub const max_packet_size = 0xF000
 
-// fn handle_select_server(client: Client) -> Result(Client, ClientError) {
-//   io.println(inspect_socket(client) <> ": waiting on server selection")
-//   // TODO: this will hang if client has sent 0xD9 Client Info
-//   let assert Ok(#(new_client, plaintext)) = read(client, 3)
-
-//   // plaintext could be either 0xD9 Client Info or 0xA0 Select Server
-//   case plaintext.bits {
-//     <<0xA0, shard_index:16>> -> {
-//       let game_server =
-//         yielder.from_list(game_servers)
-//         |> yielder.at(shard_index)
-//         |> result.lazy_unwrap(fn() {
-//           panic as "handle_select_server: index out of range"
-//         })
-//       io.debug(#(shard_index, game_server))
-//       do_work(Client(..new_client, state: NeedsRelay(game_server)))
-//     }
-//     <<0xD9, _:bits>> -> todo
-//     _ -> todo
-//   }
-// }
-
-// fn relay_to_game_server(client: Client, server: GameServer) -> Result(Client, ClientError) {
-//   io.println(inspect_socket(client) <> ": relaying to " <> server.name)
-
-//   let packet = ConnectToGameServer(server)
-//   let data = Plaintext(encode_packet(packet) |> bytes_tree.to_bit_array)
-//   let assert Ok(new_client) = write(client, data)
-
-//   Ok(Client(..new_client, state: Relayed))
-// }
 type Connection =
   glisten.Connection(BitArray)
 
 pub type Client {
-  Client(conn: Connection, inbox: BitArray, outbox: BitArray, cipher: Cipher)
+  Client(
+    conn: Connection,
+    login_seed: Option(cipher.Seed),
+    inbox: BitArray,
+    outbox: BitArray,
+    cipher: Cipher,
+  )
 }
 
 pub fn new(conn: Connection) {
-  Client(conn, <<>>, <<>>, cipher.nil())
-}
-
-fn socket_string(client: Client) -> String {
-  glisten.get_client_info(client.conn)
-  |> result.map(fn(info) {
-    let ip = glisten.ip_address_to_string(info.ip_address)
-    let port = int.to_string(info.port)
-
-    ip <> ":" <> port
-  })
-  |> result.unwrap("?")
+  Client(conn, None, <<>>, <<>>, cipher.nil())
 }
 
 pub fn inspect(client: Client) -> String {
-  socket_string(client) <> " (" <> erlang.format(process.self()) <> ")"
+  u.connection_addr(glisten.get_client_info(client.conn))
 }
 
 fn socket_read(client: Client) -> Result(Client, socket.SocketReason) {
-  use data <- result.try(tcp.receive_timeout(client.conn.socket, 0, 5000))
+  use data <- result.try(tcp.receive(client.conn.socket, 0))
   let inbox = <<client.inbox:bits, data:bits>>
 
   Ok(Client(..client, inbox:))
