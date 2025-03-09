@@ -3,19 +3,22 @@ import client.{type Client}
 import error
 import gleam/bit_array
 import gleam/erlang/process.{type Subject}
-import gleam/int
 import gleam/io
-import gleam/option
+import gleam/list
+import gleam/option.{None, Some}
 import gleam/otp/actor
 import gleam/result
 import gleam/string
 import glisten
 import glisten/tcp
+import packets/connect_to_game_server
 import packets/game_server_list
 import packets/login_denied
 import packets/login_request
 import packets/login_seed
+import packets/select_game_server
 import time_zone as tz
+import utils as u
 
 /// A login server accepts a port and a parent subject. Once started, the server
 /// authenticates connecting clients. Clients that have been successfully
@@ -49,17 +52,6 @@ pub fn stop(server: Subject(Action)) {
   server
 }
 
-fn connection_addr(result: Result(glisten.ConnectionInfo, a)) {
-  case result {
-    Ok(info) ->
-      glisten.ip_address_to_string(info.ip_address)
-      <> ":"
-      <> int.to_string(info.port)
-
-    Error(_) -> "(unknown)"
-  }
-}
-
 fn handle_message(action: Action, server: Server) {
   case action {
     Start ->
@@ -69,9 +61,9 @@ fn handle_message(action: Action, server: Server) {
 
         StoppedServer(parent, port, pool_size) -> {
           let init = fn(conn) {
-            let addr = connection_addr(glisten.get_client_info(conn))
+            let addr = u.connection_addr(glisten.get_client_info(conn))
             io.println("login_server: new connection: " <> addr)
-            #(StoppedServer(parent, port, pool_size), option.None)
+            #(StoppedServer(parent, port, pool_size), None)
           }
 
           let result =
@@ -83,7 +75,7 @@ fn handle_message(action: Action, server: Server) {
 
           case result {
             Ok(server) -> {
-              let addr = connection_addr(glisten.get_server_info(server, 5))
+              let addr = u.connection_addr(glisten.get_server_info(server, 5))
               io.println("login_server: listening on " <> addr)
               actor.continue(StartedServer(parent, server))
             }
@@ -123,13 +115,18 @@ fn message_handler(message, server: Server, conn) {
   // login, which implies that login server packets were meant to be handled
   // out-of-order, anyway.
 
-  let client = client.Client(conn, bits, <<>>, cipher.nil())
+  let client = client.Client(conn, None, bits, <<>>, cipher.nil())
   let result = case bits {
     <<0xEF, _:bits>> -> {
       // TODO: a client sending 0xD9 Spy On Client will break this process.
       use client <- result.try(handle_login_seed(client))
       use client <- result.try(handle_login_request(client))
       use client <- result.try(send_game_server_list(client, game_servers))
+      // CLient may send 0xD9 before Select Game Server here.
+      use #(client, game_server) <- result.try(handle_game_server_selection(
+        client,
+      ))
+      use client <- result.try(send_connect_to_game_server(client, game_server))
 
       Ok(client)
     }
@@ -177,7 +174,7 @@ fn handle_login_seed(client: Client) -> Result(Client, error.Error) {
 
   io.debug(login_seed)
 
-  Ok(client.Client(..client, cipher:))
+  Ok(client.Client(..client, login_seed: Some(login_seed.seed), cipher:))
 }
 
 fn handle_login_request(client: Client) {
@@ -218,5 +215,39 @@ fn send_game_server_list(
   io.debug(game_server_list)
 
   let plaintext = game_server_list.encode(game_server_list)
+  client.write(client, cipher.Ciphertext(plaintext.bits))
+}
+
+fn handle_game_server_selection(
+  client: Client,
+) -> Result(#(Client, game_server_list.GameServer), error.Error) {
+  use #(client, bits) <- result.try(client.read(
+    client,
+    select_game_server.length,
+  ))
+  let #(cipher, plaintext) = cipher.decrypt(client.cipher, bits)
+  use packet <- result.try(select_game_server.decode(plaintext))
+
+  // TODO: remove assert
+  let assert Ok(game_server) =
+    list.drop(game_servers, up_to: packet.index) |> list.first
+
+  io.debug(packet)
+
+  Ok(#(client.Client(..client, cipher:), game_server))
+}
+
+fn send_connect_to_game_server(
+  client: Client,
+  game_server: game_server_list.GameServer,
+) -> Result(Client, error.Error) {
+  let new_key = case client.login_seed {
+    Some(seed) -> cipher.seed_value(seed)
+    None -> 0
+  }
+  let packet = connect_to_game_server.ConnectToGameServer(game_server, new_key)
+  io.debug(packet)
+
+  let plaintext = connect_to_game_server.encode(packet)
   client.write(client, cipher.Ciphertext(plaintext.bits))
 }
