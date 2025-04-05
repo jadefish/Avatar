@@ -172,7 +172,7 @@ fn handle_login_seed(client: Client) -> Result(Client, error.Error) {
   use login_seed <- result.try(login_seed.decode(plaintext))
   let cipher = cipher.login(login_seed.seed, login_seed.version)
 
-  io.debug(login_seed)
+  echo login_seed
 
   Ok(client.Client(..client, login_seed: Some(login_seed.seed), cipher:))
 }
@@ -189,7 +189,7 @@ fn handle_login_request(client: Client) {
   // 3. account-in-use check
 
   // TODO: The password should be masked when printed here.
-  io.debug(login_request)
+  echo login_request
 
   Ok(client.Client(..client, cipher:))
 }
@@ -212,7 +212,7 @@ fn send_game_server_list(
       game_servers,
       game_server_list.DoNotSendSystemInfo,
     )
-  io.debug(game_server_list)
+  echo game_server_list
 
   let plaintext = game_server_list.encode(game_server_list)
   client.write(client, cipher.Ciphertext(plaintext.bits))
@@ -232,7 +232,7 @@ fn handle_game_server_selection(
   let assert Ok(game_server) =
     list.drop(game_servers, up_to: packet.index) |> list.first
 
-  io.debug(packet)
+  echo packet
 
   Ok(#(client.Client(..client, cipher:), game_server))
 }
@@ -246,7 +246,8 @@ fn send_connect_to_game_server(
     None -> 0
   }
   let packet = connect_to_game_server.ConnectToGameServer(game_server, new_key)
-  io.debug(packet)
+  
+  echo packet
 
   let plaintext = connect_to_game_server.encode(packet)
   client.write(client, cipher.Ciphertext(plaintext.bits))
