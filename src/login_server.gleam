@@ -37,9 +37,13 @@ pub opaque type Action {
   Stop
 }
 
-pub fn new(parent: Subject(LoginResult), port: Int, pool_size: Int) {
+pub fn new(
+  parent: Subject(LoginResult),
+  port port: Int,
+  pool_size pool_size: Int,
+) {
   let server = StoppedServer(parent, port, pool_size)
-  let assert Ok(subject) = actor.start(server, handle_message)
+  let assert Ok(subject) = actor.start(server, loop)
   subject
 }
 
@@ -53,7 +57,7 @@ pub fn stop(server: Subject(Action)) {
   server
 }
 
-fn handle_message(action: Action, server: Server) {
+fn loop(action: Action, server: Server) {
   case action {
     Start ->
       case server {
@@ -68,7 +72,7 @@ fn handle_message(action: Action, server: Server) {
           }
 
           let result =
-            glisten.handler(init, message_handler)
+            glisten.handler(init, handle_message)
             // UO clients don't seem to do IPv6.
             |> glisten.bind("0.0.0.0")
             |> glisten.with_pool_size(pool_size)
@@ -94,11 +98,11 @@ const test_ip = #(127, 0, 0, 1)
 
 // TODO: fetch from ... somehere.
 const game_servers = [
-  game_server_list.GameServer("US East", tz.AmericaDetroit, test_ip, 7775),
-  game_server_list.GameServer("US West", tz.AmericaLosAngeles, test_ip, 7775),
+  game_server_list.GameServer("US East", tz.AmericaDetroit, test_ip, 7080),
+  game_server_list.GameServer("US West", tz.AmericaLosAngeles, test_ip, 7081),
 ]
 
-fn message_handler(message, server: Server, conn) {
+fn handle_message(message, server: Server, conn) {
   // User-type messages are never sent to the server's subject, so this
   // assertion is safe.
   let assert glisten.Packet(bits) = message
@@ -143,7 +147,13 @@ fn message_handler(message, server: Server, conn) {
   }
 
   case result {
-    Ok(client) -> actor.send(server.parent, Ok(client))
+    Ok(client) -> {
+      let _ = tcp.close(client.conn)
+      io.println(
+        "login_server: closing connection for " <> client.inspect(client),
+      )
+      actor.send(server.parent, Ok(client))
+    }
 
     Error(error) ->
       case error {
