@@ -83,3 +83,18 @@ pub fn connection_addr(result: Result(glisten.ConnectionInfo, e)) {
     Error(_) -> "(unknown)"
   }
 }
+
+// Pack the provided byte-aligned bit array into a big-endian integer.
+pub fn pack_bytes(bits: BitArray) -> Int {
+  pack_bytes_loop(0, bits).1
+}
+
+fn pack_bytes_loop(acc: Int, bits: BitArray) -> #(BitArray, Int) {
+  case bits {
+    <<next:int, rest:bytes>> ->
+      int.bitwise_shift_left(acc, 8)
+      |> int.bitwise_or(next)
+      |> pack_bytes_loop(rest)
+    _ -> #(<<>>, acc)
+  }
+}

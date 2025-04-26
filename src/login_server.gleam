@@ -2,6 +2,7 @@ import cipher
 import client.{type Client}
 import error
 import gleam/bit_array
+import gleam/crypto
 import gleam/erlang/process.{type Subject}
 import gleam/io
 import gleam/list
@@ -75,7 +76,7 @@ fn handle_message(action: Action, server: Server) {
 
           case result {
             Ok(server) -> {
-              let addr = u.connection_addr(glisten.get_server_info(server, 5))
+              let addr = u.connection_addr(glisten.get_server_info(server, 500))
               io.println("login_server: listening on " <> addr)
               actor.continue(StartedServer(parent, server))
             }
@@ -241,10 +242,7 @@ fn send_connect_to_game_server(
   client: Client,
   game_server: game_server_list.GameServer,
 ) -> Result(Client, error.Error) {
-  let new_key = case client.login_seed {
-    Some(seed) -> cipher.seed_value(seed)
-    None -> 0
-  }
+  let new_key = crypto.strong_random_bytes(4) |> u.pack_bytes()
   let packet = connect_to_game_server.ConnectToGameServer(game_server, new_key)
   
   echo packet
