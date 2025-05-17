@@ -1,0 +1,835 @@
+diff --git a/gleam.toml b/gleam.toml
+index 759242e..7a22cae 100644
+--- a/gleam.toml
++++ b/gleam.toml
+@@ -17,9 +17,9 @@ gleam_stdlib = ">= 0.46.0 and < 2.0.0"
+ gleam_otp = ">= 0.16.0 and < 1.0.0"
+ gleam_erlang = ">= 0.31.0 and < 1.0.0"
+ glisten = ">= 7.0.0 and < 8.0.0"
+-gleam_yielder = ">= 1.1.0 and < 2.0.0"
+ tzdata = ">= 1.1.2 and < 2.0.0"
+ gleam_crypto = ">= 1.4.0 and < 2.0.0"
++youid = ">= 1.4.0 and < 2.0.0"
+ 
+ [dev-dependencies]
+ gleeunit = ">= 1.0.0 and < 2.0.0"
+diff --git a/manifest.toml b/manifest.toml
+index 157c0c0..16ba72a 100644
+--- a/manifest.toml
++++ b/manifest.toml
+@@ -7,7 +7,6 @@ packages = [
+   { name = "gleam_erlang", version = "0.34.0", build_tools = ["gleam"], requirements = ["gleam_stdlib"], otp_app = "gleam_erlang", source = "hex", outer_checksum = "0C38F2A128BAA0CEF17C3000BD2097EB80634E239CE31A86400C4416A5D0FDCC" },
+   { name = "gleam_otp", version = "0.16.1", build_tools = ["gleam"], requirements = ["gleam_erlang", "gleam_stdlib"], otp_app = "gleam_otp", source = "hex", outer_checksum = "50DA1539FC8E8FA09924EB36A67A2BBB0AD6B27BCDED5A7EF627057CF69D035E" },
+   { name = "gleam_stdlib", version = "0.59.0", build_tools = ["gleam"], requirements = [], otp_app = "gleam_stdlib", source = "hex", outer_checksum = "F8FEE9B35797301994B81AF75508CF87C328FE1585558B0FFD188DC2B32EAA95" },
+-  { name = "gleam_yielder", version = "1.1.0", build_tools = ["gleam"], requirements = ["gleam_stdlib"], otp_app = "gleam_yielder", source = "hex", outer_checksum = "8E4E4ECFA7982859F430C57F549200C7749823C106759F4A19A78AEA6687717A" },
+   { name = "gleeunit", version = "1.3.1", build_tools = ["gleam"], requirements = ["gleam_stdlib"], otp_app = "gleeunit", source = "hex", outer_checksum = "A7DD6C07B7DA49A6E28796058AA89E651D233B357D5607006D70619CD89DAAAB" },
+   { name = "glisten", version = "7.0.1", build_tools = ["gleam"], requirements = ["gleam_erlang", "gleam_otp", "gleam_stdlib", "logging", "telemetry"], otp_app = "glisten", source = "hex", outer_checksum = "1A53CF9FB3231A93FF7F1BD519A43DC968C1722F126CDD278403A78725FC5189" },
+   { name = "hackney", version = "1.23.0", build_tools = ["rebar3"], requirements = ["certifi", "idna", "metrics", "mimerl", "parse_trans", "ssl_verify_fun", "unicode_util_compat"], otp_app = "hackney", source = "hex", outer_checksum = "6CD1C04CD15C81E5A493F167B226A15F0938A84FC8F0736EBE4DDCAB65C0B44E" },
+@@ -20,6 +19,7 @@ packages = [
+   { name = "telemetry", version = "1.3.0", build_tools = ["rebar3"], requirements = [], otp_app = "telemetry", source = "hex", outer_checksum = "7015FC8919DBE63764F4B4B87A95B7C0996BD539E0D499BE6EC9D7F3875B79E6" },
+   { name = "tzdata", version = "1.1.3", build_tools = ["mix"], requirements = ["hackney"], otp_app = "tzdata", source = "hex", outer_checksum = "D4CA85575A064D29D4E94253EE95912EDFB165938743DBF002ACDF0DCECB0C28" },
+   { name = "unicode_util_compat", version = "0.7.0", build_tools = ["rebar3"], requirements = [], otp_app = "unicode_util_compat", source = "hex", outer_checksum = "25EEE6D67DF61960CF6A794239566599B09E17E668D3700247BC498638152521" },
++  { name = "youid", version = "1.4.0", build_tools = ["gleam"], requirements = ["gleam_crypto", "gleam_erlang", "gleam_stdlib"], otp_app = "youid", source = "hex", outer_checksum = "DFC3718B6BFAD7FED4303C0DDEC3275D501466CF100E556936284F72B1723968" },
+ ]
+ 
+ [requirements]
+@@ -27,7 +27,7 @@ gleam_crypto = { version = ">= 1.4.0 and < 2.0.0" }
+ gleam_erlang = { version = ">= 0.31.0 and < 1.0.0" }
+ gleam_otp = { version = ">= 0.16.0 and < 1.0.0" }
+ gleam_stdlib = { version = ">= 0.46.0 and < 2.0.0" }
+-gleam_yielder = { version = ">= 1.1.0 and < 2.0.0" }
+ gleeunit = { version = ">= 1.0.0 and < 2.0.0" }
+ glisten = { version = ">= 7.0.0 and < 8.0.0" }
+ tzdata = { version = ">= 1.1.2 and < 2.0.0" }
++youid = { version = ">= 1.4.0 and < 2.0.0" }
+diff --git a/src/aio.gleam b/src/aio.gleam
+new file mode 100644
+index 0000000..08e282f
+--- /dev/null
++++ b/src/aio.gleam
+@@ -0,0 +1,12 @@
++// This module should be named "io", but Gleam reserves this name.
++
++import error
++
++pub type Reader =
++  fn(Int) -> Result(BitArray, error.Error)
++
++pub type Writer =
++  fn(BitArray) -> Result(Int, error.Error)
++
++pub type Closer =
++  fn() -> Result(Nil, error.Error)
+diff --git a/src/cipher.gleam b/src/cipher.gleam
+index fe18f2c..1d76ab0 100644
+--- a/src/cipher.gleam
++++ b/src/cipher.gleam
+@@ -66,7 +66,7 @@ pub fn version(
+ pub opaque type Cipher {
+   NilCipher
+   LoginCipher(seed: Seed, mask: KeyPair, key: KeyPair)
+-  GameCipher
++  // GameCipher
+ }
+ 
+ /// Truncate the provided integer to 32 bits.
+@@ -101,9 +101,9 @@ pub fn nil() -> Cipher {
+   NilCipher
+ }
+ 
+-pub fn game() -> Cipher {
+-  GameCipher
+-}
++// pub fn game() -> Cipher {
++//   GameCipher
++// }
+ 
+ pub type Plaintext {
+   Plaintext(bits: BitArray)
+@@ -123,7 +123,7 @@ pub fn encrypt(cipher: Cipher, plaintext: Plaintext) -> #(Cipher, Ciphertext) {
+     NilCipher -> #(cipher, Ciphertext(plaintext.bits))
+     // The Login cipher doesn't support encrypting data.
+     LoginCipher(_, _, _) -> #(cipher, Ciphertext(plaintext.bits))
+-    GameCipher -> todo
++    // GameCipher -> todo
+   }
+ }
+ 
+@@ -143,7 +143,7 @@ pub fn decrypt(cipher: Cipher, ciphertext: Ciphertext) -> #(Cipher, Plaintext) {
+         Plaintext(bytes_tree.to_bit_array(plaintext_bytes)),
+       )
+     }
+-    GameCipher -> todo
++    // GameCipher -> todo
+   }
+ }
+ 
+diff --git a/src/client.gleam b/src/client.gleam
+index da54375..989e881 100644
+--- a/src/client.gleam
++++ b/src/client.gleam
+@@ -1,76 +1,96 @@
+-import cipher.{type Cipher}
++import aio.{type Closer, type Reader, type Writer}
++import cipher.{type Cipher, type Ciphertext, type Plaintext}
+ import error
+ import gleam/bit_array
+-import gleam/bytes_tree
+ import gleam/int
+ import gleam/io
+-import gleam/option.{type Option, None}
+ import gleam/result
+-import glisten
+-import glisten/socket
+-import glisten/tcp
+-import utils as u
++import gleam/string
++import youid/uuid
+ 
+ pub const max_packet_size = 0xF000
+ 
+-type Connection =
+-  glisten.Connection(BitArray)
++// TODO: Currently, all outgoing data is immediately written to the client's
++// underlying writer. This should likely change to be a periodic process.
+ 
+-pub type Client {
++pub opaque type Client {
+   Client(
+-    conn: Connection,
+-    login_seed: Option(cipher.Seed),
+-    inbox: BitArray,
+-    outbox: BitArray,
++    uuid: uuid.Uuid,
++    reader: Reader,
++    writer: Writer,
++    closer: Closer,
++    buffer: BitArray,
+     cipher: Cipher,
+   )
+ }
+ 
+-pub fn new(conn: Connection) {
+-  Client(conn, None, <<>>, <<>>, cipher.nil())
++pub fn new(reader: Reader, writer: Writer, closer: Closer) {
++  Client(uuid.v7(), reader, writer, closer, <<>>, cipher.nil())
++}
++
++pub fn with_cipher(client: Client, cipher cipher: cipher.Cipher) -> Client {
++  Client(..client, cipher: cipher)
++}
++
++pub fn close(client: Client) -> Result(Client, error.Error) {
++  case client.closer() {
++    Ok(_) -> Ok(client)
++
++    Error(reason) -> {
++      // TODO: Is this actually interesting enough to print or bubble up?
++      // If the connection can't be closed, I'm not sure much else can be done
++      // with it, anyway.
++      let reason = string.inspect(reason)
++      io.println(inspect(client) <> ": couldn't close connection: " <> reason)
++      Error(error.IOError(error.CloseError))
++    }
++  }
+ }
+ 
+ pub fn inspect(client: Client) -> String {
+-  u.connection_addr(glisten.get_client_info(client.conn))
++  uuid.to_string(client.uuid)
+ }
+ 
+-fn socket_read(client: Client) -> Result(Client, socket.SocketReason) {
+-  use data <- result.try(tcp.receive(client.conn.socket, 0))
+-  let inbox = <<client.inbox:bits, data:bits>>
++fn underlying_read(client: Client, size) -> Result(Client, error.Error) {
++  // `size` assumed to be in the range 0 < size < |client.buffer|.
++
++  use data <- result.try(client.reader(size))
++  let buffer = <<client.buffer:bits, data:bits>>
+ 
+-  Ok(Client(..client, inbox:))
++  Ok(Client(..client, buffer:))
+ }
+ 
+ pub fn read(
+   client: Client,
+   size: Int,
+-) -> Result(#(Client, cipher.Ciphertext), error.Error) {
+-  let size = case size {
+-    n if n < 0 -> 0
+-    n if n > max_packet_size -> max_packet_size
+-    _ -> size
+-  }
+-  let inbox_size = bit_array.byte_size(client.inbox)
++) -> Result(#(Client, Ciphertext), error.Error) {
++  let size = int.clamp(size, min: 0, max: max_packet_size)
++  let buffer_size = bit_array.byte_size(client.buffer)
+   let wanted = int.to_string(size)
+-  let have = int.to_string(inbox_size)
++  let have = int.to_string(buffer_size)
+ 
+   io.println(inspect(client) <> ": read: want " <> wanted <> ", have " <> have)
+ 
+   case size {
+     0 -> Ok(#(client, cipher.Ciphertext(<<>>)))
+ 
+-    n if n <= inbox_size -> {
+-      io.println(inspect(client) <> ": read: pulling from inbox")
+-      let assert <<bits:bytes-size(n), rest:bytes>> = client.inbox
+-      let new_client = Client(..client, inbox: rest)
++    n if n <= buffer_size -> {
++      io.println(inspect(client) <> ": read: pulling from buffer")
++
++      let assert <<bits:bytes-size(n), rest:bytes>> = client.buffer
++      let new_client = Client(..client, buffer: rest)
++
+       Ok(#(new_client, cipher.Ciphertext(bits)))
+     }
+ 
+-    n if n > inbox_size -> {
++    n if n > buffer_size -> {
++      // TODO: Under the "tick" model, this should just wait until the next
++      // tick, after which more data may've arrived in the client's buffer.
+       io.println(inspect(client) <> ": read: reading from socket")
+-      case socket_read(client) {
++
++      case underlying_read(client, n - buffer_size) {
+         Ok(new_client) -> read(new_client, size)
+-        Error(reason) -> Error(error.ReadError(reason))
++        Error(error) -> Error(error)
+       }
+     }
+ 
+@@ -78,11 +98,21 @@ pub fn read(
+   }
+ }
+ 
+-pub fn write(
+-  client: Client,
+-  ciphertext: cipher.Ciphertext,
+-) -> Result(Client, error.Error) {
+-  let bytes = bytes_tree.from_bit_array(ciphertext.bits)
+-  use _ <- u.try_map(tcp.send(client.conn.socket, bytes), error.WriteError)
++pub fn write(client: Client, data: Ciphertext) -> Result(Client, error.Error) {
++  use _n <- result.try(client.writer(data.bits))
+   Ok(client)
+ }
++
++pub fn decrypt(client: Client, data: Ciphertext) -> #(Client, Plaintext) {
++  let #(cipher, plaintext) = cipher.decrypt(client.cipher, data)
++  let new_client = with_cipher(client, cipher: cipher)
++
++  #(new_client, plaintext)
++}
++
++pub fn encrypt(client: Client, data: Plaintext) -> #(Client, Ciphertext) {
++  let #(cipher, ciphertext) = cipher.encrypt(client.cipher, data)
++  let new_client = with_cipher(client, cipher: cipher)
++
++  #(new_client, ciphertext)
++}
+diff --git a/src/error.gleam b/src/error.gleam
+index b9fa799..c2e8e8c 100644
+--- a/src/error.gleam
++++ b/src/error.gleam
+@@ -1,5 +1,3 @@
+-import glisten/socket
+-
+ pub type Error {
+   InvalidSeed
+   UnsupportedVersion
+@@ -8,12 +6,17 @@ pub type Error {
+   EncodeError
+ 
+   UnexpectedPacket
+-  ReadError(socket.SocketReason)
+-  WriteError(socket.SocketReason)
++  IOError(IOError)
+ 
+   AuthenticationError(AuthenticationError)
+ }
+ 
++pub type IOError {
++  ReadError
++  WriteError
++  CloseError
++}
++
+ pub type AuthenticationError {
+   InvalidCredentals
+   AccountInUse
+diff --git a/src/game_server.gleam b/src/game_server.gleam
+index 6875ad2..60f9c95 100644
+--- a/src/game_server.gleam
++++ b/src/game_server.gleam
+@@ -1,4 +1,3 @@
+-import cipher
+ import client
+ import gleam/bit_array
+ import gleam/erlang/process.{type Subject}
+@@ -8,8 +7,8 @@ import gleam/option.{None}
+ import gleam/otp/actor
+ import gleam/string
+ import glisten
++import tcp
+ import time_zone as tz
+-import utils as u
+ 
+ pub opaque type Server {
+   StoppedServer(
+@@ -27,6 +26,7 @@ pub opaque type Server {
+     time_zone: tz.TimeZone,
+     capacity: Int,
+     server: glisten.Server,
++    clients: List(client.Client),
+   )
+ }
+ 
+@@ -61,11 +61,11 @@ fn loop(action: Action, server: Server) {
+   case action {
+     Start ->
+       case server {
+-        StartedServer(_, _, _, _, _, _) -> actor.continue(server)
++        StartedServer(_, _, _, _, _, _, _) -> actor.continue(server)
+ 
+         StoppedServer(parent, port, pool_size, tz, capacity) -> {
+           let init = fn(conn) {
+-            let addr = u.connection_addr(glisten.get_client_info(conn))
++            let addr = tcp.socket_addr(tcp.Client(conn))
+             io.println(inspect(server) <> ": new connection: " <> addr)
+             #(server, None)
+           }
+@@ -82,11 +82,12 @@ fn loop(action: Action, server: Server) {
+               let server =
+                 StartedServer(
+                   parent,
+-                  port: port,
+-                  pool_size: pool_size,
+-                  time_zone: tz,
+-                  capacity: capacity,
+-                  server: glisten_server,
++                  port,
++                  pool_size,
++                  tz,
++                  capacity,
++                  glisten_server,
++                  [],
+                 )
+               io.println(inspect(server) <> ": started")
+               actor.continue(server)
+@@ -103,22 +104,40 @@ fn loop(action: Action, server: Server) {
+ 
+ fn inspect(server: Server) -> String {
+   case server {
+-    StartedServer(_, _, _, _, _, server) -> {
+-      let addr = u.connection_addr(glisten.get_server_info(server, 5))
++    StartedServer(_, _, _, _, _, server, _) -> {
++      let addr = tcp.socket_addr(tcp.Server(server))
+       "game_server(" <> addr <> ", " <> string.inspect(process.self()) <> ")"
+     }
+ 
+     StoppedServer(_, port, _, _, _) ->
+-      "game_server(stopped:" <> int.to_string(port) <> ")"
++      "game_server(stopped: " <> int.to_string(port) <> ")"
+   }
+ }
+ 
+-fn handle_message(message, server: Server, conn) {
++fn handle_message(
++  message: glisten.Message(a),
++  server: Server,
++  conn: glisten.Connection(b),
++) {
+   // User-type messages are never sent to the server's subject, so this
+   // assertion is safe.
+   let assert glisten.Packet(bits) = message
+-  let client = client.Client(conn, None, bits, <<>>, cipher.nil())
+-  let client_addr = u.connection_addr(glisten.get_client_info(client.conn))
++
++  // Stopped servers can't handle messages.
++  let assert StartedServer(_, _, _, _, _, _, _) = server
++
++  let client =
++    client.new(
++      tcp.reader(conn.socket, timeout: 5000),
++      tcp.writer(conn.socket),
++      tcp.closer(conn.socket),
++    )
++
++  // TODO: surely there's a better way to update these records.
++  let server = StartedServer(..server, clients: [client, ..server.clients])
++  // let client_addr = tcp.connection_addr(glisten.get_client_info(conn))
++  // let client_addr = glisten.get_client_info(conn) |> result.map(fn(ci) { tcp.connection_addr2(ci) }) |> result.unwrap("(unknown)")
++  let client_addr = tcp.socket_addr(tcp.Client(conn))
+   let size = bit_array.byte_size(bits)
+ 
+   // expecting 4 + 65 bytes: seed (IP, little endian; or whatever login server
+diff --git a/src/ipv4.gleam b/src/ipv4.gleam
+deleted file mode 100644
+index 6608262..0000000
+--- a/src/ipv4.gleam
++++ /dev/null
+@@ -1,2 +0,0 @@
+-pub type IPv4 =
+-  #(Int, Int, Int, Int)
+diff --git a/src/login_server.gleam b/src/login_server.gleam
+index 1efab0a..453ef93 100644
+--- a/src/login_server.gleam
++++ b/src/login_server.gleam
+@@ -6,18 +6,18 @@ import gleam/crypto
+ import gleam/erlang/process.{type Subject}
+ import gleam/io
+ import gleam/list
+-import gleam/option.{None, Some}
++import gleam/option.{None}
+ import gleam/otp/actor
+ import gleam/result
+ import gleam/string
+ import glisten
+-import glisten/tcp
+ import packets/connect_to_game_server
+ import packets/game_server_list
+ import packets/login_denied
+ import packets/login_request
+ import packets/login_seed
+ import packets/select_game_server
++import tcp
+ import time_zone as tz
+ import utils as u
+ 
+@@ -26,7 +26,7 @@ import utils as u
+ /// authenticated are ready to be relayed to a game server.
+ pub opaque type Server {
+   StoppedServer(parent: Subject(LoginResult), port: Int, pool_size: Int)
+-  StartedServer(parent: Subject(LoginResult), server: glisten.Server)
++  StartedServer(parent: Subject(LoginResult), clients: List(Client))
+ }
+ 
+ pub type LoginResult =
+@@ -35,6 +35,9 @@ pub type LoginResult =
+ pub opaque type Action {
+   Start
+   Stop
++
++  // GameServerOnlined(game_server: GameServer)
++  // GameServerOfflined(game_server: GameServer)
+ }
+ 
+ pub fn new(
+@@ -66,7 +69,7 @@ fn loop(action: Action, server: Server) {
+ 
+         StoppedServer(parent, port, pool_size) -> {
+           let init = fn(conn) {
+-            let addr = u.connection_addr(glisten.get_client_info(conn))
++            let addr = tcp.socket_addr(tcp.Client(conn))
+             io.println("login_server: new connection: " <> addr)
+             #(StoppedServer(parent, port, pool_size), None)
+           }
+@@ -80,9 +83,9 @@ fn loop(action: Action, server: Server) {
+ 
+           case result {
+             Ok(server) -> {
+-              let addr = u.connection_addr(glisten.get_server_info(server, 500))
++              let addr = tcp.socket_addr(tcp.Server(server))
+               io.println("login_server: listening on " <> addr)
+-              actor.continue(StartedServer(parent, server))
++              actor.continue(StartedServer(parent, []))
+             }
+ 
+             Error(error) -> actor.Stop(process.Abnormal(string.inspect(error)))
+@@ -102,11 +105,18 @@ const game_servers = [
+   game_server_list.GameServer("US West", tz.AmericaLosAngeles, test_ip, 7081),
+ ]
+ 
+-fn handle_message(message, server: Server, conn) {
++fn handle_message(
++  message: glisten.Message(a),
++  server: Server,
++  conn: glisten.Connection(b),
++) {
+   // User-type messages are never sent to the server's subject, so this
+   // assertion is safe.
+   let assert glisten.Packet(bits) = message
+ 
++  // Stopped servers cannot accept clients.
++  let assert StartedServer(_, _) = server
++
+   // TODO: Reconsider this design. Currently, there are two ways to read data
+   // from a client: glisten's message handler (this function) and the
+   // client.read function.
+@@ -120,7 +130,13 @@ fn handle_message(message, server: Server, conn) {
+   // login, which implies that login server packets were meant to be handled
+   // out-of-order, anyway.
+ 
+-  let client = client.Client(conn, None, bits, <<>>, cipher.nil())
++  let client =
++    client.new(
++      tcp.reader(conn.socket, timeout: 5000),
++      tcp.writer(conn.socket),
++      tcp.closer(conn.socket),
++    )
++  let server = StartedServer(..server, clients: [client, ..server.clients])
+   let result = case bits {
+     <<0xEF, _:bits>> -> {
+       // TODO: a client sending 0xD9 Spy On Client will break this process.
+@@ -128,9 +144,7 @@ fn handle_message(message, server: Server, conn) {
+       use client <- result.try(handle_login_request(client))
+       use client <- result.try(send_game_server_list(client, game_servers))
+       // CLient may send 0xD9 before Select Game Server here.
+-      use #(client, game_server) <- result.try(handle_game_server_selection(
+-        client,
+-      ))
++      use #(client, game_server) <- result.try(select_game_server(client))
+       use client <- result.try(send_connect_to_game_server(client, game_server))
+ 
+       Ok(client)
+@@ -138,60 +152,52 @@ fn handle_message(message, server: Server, conn) {
+ 
+     bits -> {
+       io.println("login_server: bad packet: " <> bit_array.inspect(bits))
+-
+-      // It's fine if the connection couldn't be closed.
+-      let _ = tcp.close(conn)
+-
++      let _ = client.close(client)
+       Error(error.UnexpectedPacket)
+     }
+   }
+ 
+-  case result {
+-    Ok(client) -> {
+-      let _ = tcp.close(client.conn)
+-      io.println(
+-        "login_server: closing connection for " <> client.inspect(client),
+-      )
+-      actor.send(server.parent, Ok(client))
+-    }
++  let result = case result {
++    Ok(client) -> client.close(client)
+ 
+     Error(error) ->
+       case error {
+         error.AuthenticationError(auth_error) -> {
+-          let _ = case auth_error {
++          case auth_error {
+             error.AccountBanned ->
+               deny_login(client, login_denied.AccountBanned)
++
+             error.AccountInUse -> deny_login(client, login_denied.AccountInUse)
++
+             error.InvalidCredentals ->
+               deny_login(client, login_denied.InvalidCredentials)
+           }
+-
+-          actor.send(server.parent, result)
+         }
+ 
+-        _ -> actor.send(server.parent, result)
++        _ -> result
+       }
+   }
+ 
++  actor.send(server.parent, result)
+   actor.continue(server)
+ }
+ 
+ fn handle_login_seed(client: Client) -> Result(Client, error.Error) {
+   // Receive 0xEF Login Seed (unencrypted, length 21):
+   use #(client, bits) <- result.try(client.read(client, 21))
+-  let #(cipher, plaintext) = cipher.decrypt(client.cipher, bits)
++  let plaintext = cipher.Plaintext(bits.bits)
+   use login_seed <- result.try(login_seed.decode(plaintext))
+   let cipher = cipher.login(login_seed.seed, login_seed.version)
+ 
+   echo login_seed
+ 
+-  Ok(client.Client(..client, login_seed: Some(login_seed.seed), cipher:))
++  Ok(client.with_cipher(client, cipher: cipher))
+ }
+ 
+-fn handle_login_request(client: Client) {
++fn handle_login_request(client: Client) -> Result(Client, error.Error) {
+   // Receive 0x80 Login Request (encrypted, length 62):
+   use #(client, bits) <- result.try(client.read(client, 62))
+-  let #(cipher, plaintext) = cipher.decrypt(client.cipher, bits)
++  let #(client, plaintext) = client.decrypt(client, bits)
+   use login_request <- result.try(login_request.decode(plaintext))
+ 
+   // TODO: Authenticate the client:
+@@ -202,15 +208,13 @@ fn handle_login_request(client: Client) {
+   // TODO: The password should be masked when printed here.
+   echo login_request
+ 
+-  Ok(client.Client(..client, cipher:))
++  Ok(client)
+ }
+ 
+-fn deny_login(
+-  client: Client,
+-  reason: login_denied.Reason,
+-) -> Result(Client, error.Error) {
++fn deny_login(client: Client, reason: login_denied.Reason) -> Result(Client, error.Error) {
+   let packet = login_denied.LoginDenied(reason)
+   let plaintext = login_denied.encode(packet)
++
+   client.write(client, cipher.Ciphertext(plaintext.bits))
+ }
+ 
+@@ -229,14 +233,14 @@ fn send_game_server_list(
+   client.write(client, cipher.Ciphertext(plaintext.bits))
+ }
+ 
+-fn handle_game_server_selection(
++fn select_game_server(
+   client: Client,
+ ) -> Result(#(Client, game_server_list.GameServer), error.Error) {
+   use #(client, bits) <- result.try(client.read(
+     client,
+     select_game_server.length,
+   ))
+-  let #(cipher, plaintext) = cipher.decrypt(client.cipher, bits)
++  let #(client, plaintext) = client.decrypt(client, bits)
+   use packet <- result.try(select_game_server.decode(plaintext))
+ 
+   // TODO: remove assert
+@@ -245,7 +249,7 @@ fn handle_game_server_selection(
+ 
+   echo packet
+ 
+-  Ok(#(client.Client(..client, cipher:), game_server))
++  Ok(#(client, game_server))
+ }
+ 
+ fn send_connect_to_game_server(
+@@ -254,7 +258,7 @@ fn send_connect_to_game_server(
+ ) -> Result(Client, error.Error) {
+   let new_key = crypto.strong_random_bytes(4) |> u.pack_bytes()
+   let packet = connect_to_game_server.ConnectToGameServer(game_server, new_key)
+-  
++
+   echo packet
+ 
+   let plaintext = connect_to_game_server.encode(packet)
+diff --git a/src/packets/game_server_list.gleam b/src/packets/game_server_list.gleam
+index edaf09c..c6ed683 100644
+--- a/src/packets/game_server_list.gleam
++++ b/src/packets/game_server_list.gleam
+@@ -4,7 +4,6 @@ import gleam/int
+ import gleam/list
+ import gleam/result
+ import gleam/string
+-import ipv4.{type IPv4}
+ import time_zone.{type TimeZone}
+ 
+ /// `0xA8` Game Server List. Variable length, unencrypted.
+@@ -14,6 +13,9 @@ pub type GameServerList {
+   GameServerList(servers: List(GameServer), system_info_flag: SystemInfoFlag)
+ }
+ 
++pub type IPv4 =
++  #(Int, Int, Int, Int)
++
+ pub type GameServer {
+   GameServer(name: String, time_zone: TimeZone, ip: IPv4, port: Int)
+ }
+diff --git a/src/tcp.gleam b/src/tcp.gleam
+new file mode 100644
+index 0000000..f5f8f1d
+--- /dev/null
++++ b/src/tcp.gleam
+@@ -0,0 +1,89 @@
++import gleam/result
++import gleam/int
++import aio.{type Closer, type Reader, type Writer}
++import error
++import gleam/bit_array
++import gleam/bytes_tree
++import glisten
++import glisten/socket
++import glisten/tcp
++
++pub fn reader(socket: socket.Socket, timeout timeout: Int) -> Reader {
++  case timeout {
++    n if n <= 0 -> {
++      // Size is ignored – always read all available data.
++      fn(_n) {
++        case tcp.receive_timeout(socket, 0, timeout) {
++          Ok(data) -> Ok(data)
++          Error(_) -> Error(error.IOError(error.ReadError))
++        }
++      }
++    }
++
++    _ -> {
++      fn(_n) {
++        // Size is ignored – always read all available data.
++        case tcp.receive(socket, 0) {
++          Ok(data) -> Ok(data)
++          Error(_) -> Error(error.IOError(error.ReadError))
++        }
++      }
++    }
++  }
++}
++
++pub fn writer(socket: socket.Socket) -> Writer {
++  fn(bits) {
++    let bytes = bytes_tree.from_bit_array(bits)
++    let n = bit_array.byte_size(bits)
++
++    case tcp.send(socket, bytes) {
++      // TODO: gen_tcp:send doesn't indicate how much data was written. Is it
++      // safe here to assume all data was written?
++      Ok(_) -> Ok(n)
++      Error(_) -> Error(error.IOError(error.WriteError))
++    }
++  }
++}
++
++pub fn closer(socket: socket.Socket) -> Closer {
++  fn() {
++    case tcp.close(socket) {
++      Ok(_) -> Ok(Nil)
++      Error(_) -> Error(error.IOError(error.CloseError))
++    }
++  }
++}
++
++pub type SocketType(message_type) {
++  Client(glisten.Connection(message_type))
++  Server(glisten.Server)
++}
++
++/// Returns a string address for a glisten socket (client or server) in the
++/// format `ip:port`.
++///
++/// ## Examples
++/// ```gleam
++/// socket_addr(Client(client_socket.conn))
++/// // "127.0.0.1:51484"
++///
++/// socket_addr(Server(some_server))
++/// // "127.0.0.1:7775"
++/// ```
++pub fn socket_addr(socket: SocketType(_)) {
++  let result = case socket {
++    Client(conn) -> glisten.get_client_info(conn)
++    Server(server) ->
++      glisten.get_server_info(server, 500) |> result.replace_error(Nil)
++  }
++
++  case result {
++    Ok(connection_info) -> {
++      let glisten.ConnectionInfo(port, ip) = connection_info
++      glisten.ip_address_to_string(ip) <> ":" <> int.to_string(port)
++    }
++
++    Error(_) -> "(unknown)"
++  }
++}
+diff --git a/src/utils.gleam b/src/utils.gleam
+index 388a7e2..52d6e53 100644
+--- a/src/utils.gleam
++++ b/src/utils.gleam
+@@ -1,6 +1,5 @@
+ import gleam/int
+ import gleam/result
+-import glisten
+ 
+ /// Remove all NUL bytes from the provided bit array.
+ pub fn trim_nul(bits: BitArray) -> BitArray {
+@@ -64,26 +63,6 @@ pub fn try_map(
+   result.try(result |> result.map_error(mapping), fun)
+ }
+ 
+-/// Returns a string address for a glisten connection (client or server) in the
+-/// format `ip:port`.
+-///
+-/// ## Examples
+-/// ```gleam
+-/// connection_addr(glisten.get_client_info(some_conn))
+-/// // "127.0.0.1:51484"
+-///
+-/// connection_addr(glisten.get_server_info(some_server))
+-/// // "127.0.0.1:7775"
+-/// ```
+-pub fn connection_addr(result: Result(glisten.ConnectionInfo, e)) {
+-  case result {
+-    Ok(glisten.ConnectionInfo(port, ip)) ->
+-      glisten.ip_address_to_string(ip) <> ":" <> int.to_string(port)
+-
+-    Error(_) -> "(unknown)"
+-  }
+-}
+-
+ // Pack the provided byte-aligned bit array into a big-endian integer.
+ pub fn pack_bytes(bits: BitArray) -> Int {
+   pack_bytes_loop(0, bits).1
+diff --git a/test/client_test.gleam b/test/client_test.gleam
+new file mode 100644
+index 0000000..ba68698
+--- /dev/null
++++ b/test/client_test.gleam
+@@ -0,0 +1,21 @@
++import client
++import gleeunit
++import gleeunit/should
++
++pub fn main() {
++  gleeunit.main()
++}
++
++pub fn read_test() {
++  let reader = fn(_n) { Ok(<<1, 2, 3, 4>>) }
++  let writer = fn(_bits) { Ok(0) }
++  let closer = fn() { Ok(Nil) }
++  let client = client.new(reader, writer, closer)
++  let result = client.read(client, 4)
++
++  result |> should.be_ok
++
++  let assert Ok(#(_, data)) = client.read(client, 4)
++
++  data.bits |> should.equal(<<1, 2, 3, 4>>)
++}
