@@ -1,6 +1,7 @@
 import cipher
 import error
 import gleam/bit_array
+import gleam/string
 import utils as u
 
 /// `0x80` Login Request. Length 62, encrypted.
@@ -27,4 +28,10 @@ pub fn decode(data: cipher.Plaintext) -> Result(LoginRequest, error.Error) {
 
     _ -> Error(error.DecodeError)
   }
+}
+
+pub fn inspect(login_request: LoginRequest) -> String {
+  // TODO: is there a better way to mask strings?
+  string.inspect(login_request)
+  |> string.replace(login_request.password, "****")
 }

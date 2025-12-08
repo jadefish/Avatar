@@ -66,6 +66,7 @@ pub fn version(
 pub opaque type Cipher {
   NilCipher
   LoginCipher(seed: Seed, mask: KeyPair, key: KeyPair)
+  // GameCipher
 }
 
 /// Truncate the provided integer to 32 bits.
@@ -100,6 +101,10 @@ pub fn nil() -> Cipher {
   NilCipher
 }
 
+// pub fn game() -> Cipher {
+//   GameCipher
+// }
+
 pub type Plaintext {
   Plaintext(bits: BitArray)
 }
@@ -118,6 +123,7 @@ pub fn encrypt(cipher: Cipher, plaintext: Plaintext) -> #(Cipher, Ciphertext) {
     NilCipher -> #(cipher, Ciphertext(plaintext.bits))
     // The Login cipher doesn't support encrypting data.
     LoginCipher(_, _, _) -> #(cipher, Ciphertext(plaintext.bits))
+    // GameCipher -> todo
   }
 }
 
@@ -137,6 +143,7 @@ pub fn decrypt(cipher: Cipher, ciphertext: Ciphertext) -> #(Cipher, Plaintext) {
         Plaintext(bytes_tree.to_bit_array(plaintext_bytes)),
       )
     }
+    // GameCipher -> todo
   }
 }
 

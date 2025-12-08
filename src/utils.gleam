@@ -1,6 +1,5 @@
 import gleam/int
 import gleam/result
-import glisten
 
 /// Remove all NUL bytes from the provided bit array.
 pub fn trim_nul(bits: BitArray) -> BitArray {
@@ -64,37 +63,24 @@ pub fn try_map(
   result.try(result |> result.map_error(mapping), fun)
 }
 
-/// Returns a string address for a glisten connection (client or server) in the
-/// format `ip:port`.
-///
-/// ## Examples
-/// ```gleam
-/// connection_addr(glisten.get_client_info(some_conn))
-/// // "127.0.0.1:51484"
-///
-/// connection_addr(glisten.get_server_info(some_server))
-/// // "127.0.0.1:7775"
-/// ```
-pub fn connection_addr(result: Result(glisten.ConnectionInfo, e)) {
+pub fn lazy_unwrap_error(result: Result(a, e), or default: fn(a) -> e) -> e {
   case result {
-    Ok(glisten.ConnectionInfo(port, ip)) ->
-      glisten.ip_address_to_string(ip) <> ":" <> int.to_string(port)
-
-    Error(_) -> "(unknown)"
+    Ok(v) -> default(v)
+    Error(e) -> e
   }
 }
 
-// Pack the provided byte-aligned bit array into a big-endian integer.
+/// Pack the provided byte-aligned bit array into a big-endian integer.
 pub fn pack_bytes(bits: BitArray) -> Int {
-  pack_bytes_loop(0, bits).1
+  pack_bytes_loop(0, bits)
 }
 
-fn pack_bytes_loop(acc: Int, bits: BitArray) -> #(BitArray, Int) {
+fn pack_bytes_loop(acc: Int, bits: BitArray) -> Int {
   case bits {
     <<next:int, rest:bytes>> ->
       int.bitwise_shift_left(acc, 8)
       |> int.bitwise_or(next)
       |> pack_bytes_loop(rest)
-    _ -> #(<<>>, acc)
+    _ -> acc
   }
 }

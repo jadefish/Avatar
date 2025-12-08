@@ -4,7 +4,6 @@ import gleam/int
 import gleam/list
 import gleam/result
 import gleam/string
-import ipv4.{type IPv4}
 import time_zone.{type TimeZone}
 
 /// `0xA8` Game Server List. Variable length, unencrypted.
@@ -13,6 +12,9 @@ import time_zone.{type TimeZone}
 pub type GameServerList {
   GameServerList(servers: List(GameServer), system_info_flag: SystemInfoFlag)
 }
+
+pub type IPv4 =
+  #(Int, Int, Int, Int)
 
 pub type GameServer {
   GameServer(name: String, time_zone: TimeZone, ip: IPv4, port: Int)

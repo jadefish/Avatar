@@ -1,5 +1,3 @@
-import glisten/socket
-
 pub type Error {
   InvalidSeed
   UnsupportedVersion
@@ -8,10 +6,15 @@ pub type Error {
   EncodeError
 
   UnexpectedPacket
-  ReadError(socket.SocketReason)
-  WriteError(socket.SocketReason)
+  IOError(IOError)
 
   AuthenticationError(AuthenticationError)
+}
+
+pub type IOError {
+  ReadError
+  WriteError
+  CloseError
 }
 
 pub type AuthenticationError {

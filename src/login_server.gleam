@@ -1,23 +1,26 @@
+import ansi
 import cipher
 import client.{type Client}
 import error
 import gleam/bit_array
 import gleam/crypto
+import gleam/dict
 import gleam/erlang/process.{type Subject}
-import gleam/io
+import gleam/int
 import gleam/list
-import gleam/option.{None, Some}
+import gleam/option.{None}
 import gleam/otp/actor
 import gleam/result
 import gleam/string
 import glisten
-import glisten/tcp
+import log
 import packets/connect_to_game_server
 import packets/game_server_list
 import packets/login_denied
 import packets/login_request
 import packets/login_seed
 import packets/select_game_server
+import tcp
 import time_zone as tz
 import utils as u
 
@@ -25,8 +28,12 @@ import utils as u
 /// authenticates connecting clients. Clients that have been successfully
 /// authenticated are ready to be relayed to a game server.
 pub opaque type Server {
-  StoppedServer(parent: Subject(LoginResult), port: Int, pool_size: Int)
-  StartedServer(parent: Subject(LoginResult), server: glisten.Server)
+  Server(
+    parent: Subject(LoginResult),
+    port: Int,
+    pool_size: Int,
+    clients: dict.Dict(glisten.ConnectionInfo, Client),
+  )
 }
 
 pub type LoginResult =
@@ -37,56 +44,88 @@ pub opaque type Action {
   Stop
 }
 
-pub fn new(parent: Subject(LoginResult), port: Int, pool_size: Int) {
-  let server = StoppedServer(parent, port, pool_size)
-  let assert Ok(subject) = actor.start(server, handle_message)
+pub fn new(
+  parent: Subject(LoginResult),
+  port port: Int,
+  pool_size pool_size: Int,
+) -> Subject(Action) {
+  let server = Server(parent, port, pool_size, dict.new())
+  let assert Ok(actor.Started(_pid, subject)) =
+    actor.new(server)
+    |> actor.on_message(loop)
+    |> actor.start
   subject
 }
 
-pub fn start(server: Subject(Action)) {
-  actor.send(server, Start)
-  server
+pub fn start(subject: Subject(Action)) -> Subject(Action) {
+  actor.send(subject, Start)
+  subject
 }
 
-pub fn stop(server: Subject(Action)) {
-  actor.send(server, Stop)
-  server
+pub fn stop(subject: Subject(Action)) -> Subject(Action) {
+  actor.send(subject, Stop)
+  subject
 }
 
-fn handle_message(action: Action, server: Server) {
+fn inspect(server: Server) -> String {
+  // TODO: get IP from glisten? not sure how to get its process name for
+  // glisten's get_server_info function.
+  ansi.bold(ansi.magenta("LOGIN")) <> " 0.0.0.0:" <> int.to_string(server.port)
+}
+
+fn find_client(
+  server: Server,
+  conn: glisten.Connection(a),
+) -> Result(Client, Nil) {
+  let assert Ok(info) = glisten.get_client_info(conn)
+  dict.get(server.clients, info)
+}
+
+fn loop(server: Server, action: Action) -> actor.Next(Server, Action) {
   case action {
-    Start ->
-      case server {
-        // Starting an already-started server does nothing.
-        StartedServer(_, _) -> actor.continue(server)
+    Start -> {
+      let init = fn(conn) {
+        let addr = tcp.client_addr_string(conn)
+        log.info(inspect(server) <> ": new connection: " <> addr)
 
-        StoppedServer(parent, port, pool_size) -> {
-          let init = fn(conn) {
-            let addr = u.connection_addr(glisten.get_client_info(conn))
-            io.println("login_server: new connection: " <> addr)
-            #(StoppedServer(parent, port, pool_size), None)
-          }
-
-          let result =
-            glisten.handler(init, message_handler)
-            // UO clients don't seem to do IPv6.
-            |> glisten.bind("0.0.0.0")
-            |> glisten.with_pool_size(pool_size)
-            |> glisten.start_server(port)
-
-          case result {
-            Ok(server) -> {
-              let addr = u.connection_addr(glisten.get_server_info(server, 500))
-              io.println("login_server: listening on " <> addr)
-              actor.continue(StartedServer(parent, server))
-            }
-
-            Error(error) -> actor.Stop(process.Abnormal(string.inspect(error)))
-          }
-        }
+        let client =
+          client.new(
+            addr,
+            tcp.reader(conn.socket, timeout: 5000),
+            tcp.writer(conn.socket),
+            tcp.closer(conn.socket),
+          )
+        let assert Ok(connection_info) = glisten.get_client_info(conn)
+        let clients = dict.insert(server.clients, connection_info, client)
+        let new_server = Server(..server, clients: clients)
+        #(new_server, None)
       }
 
-    Stop -> actor.Stop(process.Normal)
+      let result =
+        glisten.new(init, handle_message)
+        |> glisten.bind("0.0.0.0")
+        |> glisten.with_pool_size(server.pool_size)
+        // TODO: |> glisten.with_close(...) 
+        |> glisten.start(server.port)
+
+      case result {
+        Ok(_supervisor) -> {
+          log.info(inspect(server) <> ": listening")
+          actor.continue(server)
+        }
+
+        Error(error) -> {
+          log.error(
+            inspect(server) <> ": start error: " <> string.inspect(error),
+          )
+          actor.stop_abnormal(string.inspect(error))
+        }
+      }
+    }
+
+    Stop -> {
+      actor.stop()
+    }
   }
 }
 
@@ -94,11 +133,15 @@ const test_ip = #(127, 0, 0, 1)
 
 // TODO: fetch from ... somehere.
 const game_servers = [
-  game_server_list.GameServer("US East", tz.AmericaDetroit, test_ip, 7775),
-  game_server_list.GameServer("US West", tz.AmericaLosAngeles, test_ip, 7775),
+  game_server_list.GameServer("US East", tz.AmericaDetroit, test_ip, 7080),
+  game_server_list.GameServer("US West", tz.AmericaLosAngeles, test_ip, 7081),
 ]
 
-fn message_handler(message, server: Server, conn) {
+fn handle_message(
+  server: Server,
+  message: glisten.Message(a),
+  conn: glisten.Connection(b),
+) -> glisten.Next(Server, glisten.Message(a)) {
   // User-type messages are never sent to the server's subject, so this
   // assertion is safe.
   let assert glisten.Packet(bits) = message
@@ -107,104 +150,161 @@ fn message_handler(message, server: Server, conn) {
   // from a client: glisten's message handler (this function) and the
   // client.read function.
   //
-  // Since login server packets are strictly ordered, a design wherein glisten
-  // simply pushes read data into an inbox isn't ideal. It could work, if an
-  // internal "authentication step" state variable is maintained for each
-  // client, but both the current design and this feel awkward to use.
+  // Instead, maybe maintain an internal "authentication step" state variable
+  // for each client to inform which packet is expected to be received and what
+  // to send back.
   //
   // Occasionally, a client will send the 0xD9 Spy On Client packet during
   // login, which implies that login server packets were meant to be handled
   // out-of-order, anyway.
 
-  let client = client.Client(conn, None, bits, <<>>, cipher.nil())
+  use client <- u.lazy_unwrap_error(
+    find_client(server, conn) |> result.replace_error(glisten.continue(server)),
+  )
+
+  // TODO: this doesn't work when Client is opaque (which is should be)
+  let client = client.Client(..client, buffer: bits)
+
   let result = case bits {
     <<0xEF, _:bits>> -> {
       // TODO: a client sending 0xD9 Spy On Client will break this process.
-      use client <- result.try(handle_login_seed(client))
-      use client <- result.try(handle_login_request(client))
-      use client <- result.try(send_game_server_list(client, game_servers))
-      // CLient may send 0xD9 before Select Game Server here.
-      use #(client, game_server) <- result.try(handle_game_server_selection(
+      use client <- result.try(handle_login_seed(server, client))
+      use client <- result.try(handle_login_request(server, client))
+      use client <- result.try(send_game_server_list(
+        server,
+        client,
+        game_servers,
+      ))
+      // Client may send 0xD9 before Select Game Server here.
+      use #(client, game_server) <- result.try(select_game_server(
+        server,
         client,
       ))
-      use client <- result.try(send_connect_to_game_server(client, game_server))
+      use client <- result.try(send_connect_to_game_server(
+        server,
+        client,
+        game_server,
+      ))
 
       Ok(client)
     }
 
     bits -> {
-      io.println("login_server: bad packet: " <> bit_array.inspect(bits))
-
-      // It's fine if the connection couldn't be closed.
-      let _ = tcp.close(conn)
-
+      log.warning(
+        inspect(server) <> ": bad packet: " <> bit_array.inspect(bits),
+      )
       Error(error.UnexpectedPacket)
     }
   }
 
-  case result {
-    Ok(client) -> actor.send(server.parent, Ok(client))
+  let result = case result {
+    Ok(client) -> client.close(client)
 
     Error(error) ->
       case error {
         error.AuthenticationError(auth_error) -> {
-          let _ = case auth_error {
+          case auth_error {
             error.AccountBanned ->
-              deny_login(client, login_denied.AccountBanned)
-            error.AccountInUse -> deny_login(client, login_denied.AccountInUse)
-            error.InvalidCredentals ->
-              deny_login(client, login_denied.InvalidCredentials)
-          }
+              deny_login(server, client, login_denied.AccountBanned)
 
-          actor.send(server.parent, result)
+            error.AccountInUse ->
+              deny_login(server, client, login_denied.AccountInUse)
+
+            error.InvalidCredentals ->
+              deny_login(server, client, login_denied.InvalidCredentials)
+          }
         }
 
-        _ -> actor.send(server.parent, result)
+        error.DecodeError
+        | error.EncodeError
+        | error.IOError(_)
+        | error.UnexpectedPacket
+        | error.InvalidSeed -> {
+          log.error(
+            inspect(server)
+            <> ": error handling message: "
+            <> string.inspect(error),
+          )
+          deny_login(server, client, login_denied.CommunicationProblem)
+        }
+
+        _ -> deny_login(server, client, login_denied.GenericDenial)
       }
   }
 
-  actor.continue(server)
+  actor.send(server.parent, result)
+  glisten.continue(server)
 }
 
-fn handle_login_seed(client: Client) -> Result(Client, error.Error) {
+fn handle_login_seed(
+  server: Server,
+  client: Client,
+) -> Result(Client, error.Error) {
   // Receive 0xEF Login Seed (unencrypted, length 21):
   use #(client, bits) <- result.try(client.read(client, 21))
-  let #(cipher, plaintext) = cipher.decrypt(client.cipher, bits)
+  let plaintext = cipher.Plaintext(bits.bits)
   use login_seed <- result.try(login_seed.decode(plaintext))
   let cipher = cipher.login(login_seed.seed, login_seed.version)
 
-  echo login_seed
+  log.info(
+    inspect(server)
+    <> ": got Login Seed from client "
+    <> client.inspect(client)
+    <> ": "
+    <> string.inspect(login_seed),
+  )
 
-  Ok(client.Client(..client, login_seed: Some(login_seed.seed), cipher:))
+  Ok(client.with_cipher(client, cipher: cipher))
 }
 
-fn handle_login_request(client: Client) {
+fn handle_login_request(
+  server: Server,
+  client: Client,
+) -> Result(Client, error.Error) {
   // Receive 0x80 Login Request (encrypted, length 62):
   use #(client, bits) <- result.try(client.read(client, 62))
-  let #(cipher, plaintext) = cipher.decrypt(client.cipher, bits)
+  let #(client, plaintext) = client.decrypt(client, bits)
   use login_request <- result.try(login_request.decode(plaintext))
+
+  // TODO: mask password in this output
+  log.info(
+    inspect(server)
+    <> ": got Login Request from client "
+    <> client.inspect(client)
+    <> ": "
+    <> login_request.inspect(login_request),
+  )
 
   // TODO: Authenticate the client:
   // 1. credential match
   // 2. ban check
   // 3. account-in-use check
 
-  // TODO: The password should be masked when printed here.
-  echo login_request
-
-  Ok(client.Client(..client, cipher:))
+  Ok(client)
 }
 
 fn deny_login(
+  server: Server,
   client: Client,
   reason: login_denied.Reason,
 ) -> Result(Client, error.Error) {
   let packet = login_denied.LoginDenied(reason)
   let plaintext = login_denied.encode(packet)
+
+  log.info(
+    inspect(server)
+    <> ": sending Login Denied to client "
+    <> client.inspect(client)
+    <> ": "
+    <> string.inspect(packet),
+  )
+
   client.write(client, cipher.Ciphertext(plaintext.bits))
+  // No need to close the connection here – client closes its end.
 }
 
 fn send_game_server_list(
+  server: Server,
   client: Client,
   game_servers: List(game_server_list.GameServer),
 ) {
@@ -213,39 +313,60 @@ fn send_game_server_list(
       game_servers,
       game_server_list.DoNotSendSystemInfo,
     )
-  echo game_server_list
+
+  log.info(
+    inspect(server)
+    <> ": sending Game Server List to client "
+    <> client.inspect(client)
+    <> ": "
+    <> string.inspect(game_server_list),
+  )
 
   let plaintext = game_server_list.encode(game_server_list)
   client.write(client, cipher.Ciphertext(plaintext.bits))
 }
 
-fn handle_game_server_selection(
+fn select_game_server(
+  server: Server,
   client: Client,
 ) -> Result(#(Client, game_server_list.GameServer), error.Error) {
   use #(client, bits) <- result.try(client.read(
     client,
     select_game_server.length,
   ))
-  let #(cipher, plaintext) = cipher.decrypt(client.cipher, bits)
+  let #(client, plaintext) = client.decrypt(client, bits)
   use packet <- result.try(select_game_server.decode(plaintext))
 
-  // TODO: remove assert
+  log.info(
+    inspect(server)
+    <> ": got Select Game Server from client "
+    <> client.inspect(client)
+    <> ": "
+    <> string.inspect(packet),
+  )
+
+  // TODO: can't assume there will always be a game server – remove this assert.
   let assert Ok(game_server) =
     list.drop(game_servers, up_to: packet.index) |> list.first
 
-  echo packet
-
-  Ok(#(client.Client(..client, cipher:), game_server))
+  Ok(#(client, game_server))
 }
 
 fn send_connect_to_game_server(
+  server: Server,
   client: Client,
   game_server: game_server_list.GameServer,
 ) -> Result(Client, error.Error) {
   let new_key = crypto.strong_random_bytes(4) |> u.pack_bytes()
   let packet = connect_to_game_server.ConnectToGameServer(game_server, new_key)
-  
-  echo packet
+
+  log.info(
+    inspect(server)
+    <> ": sending Connect To Game Server to client "
+    <> client.inspect(client)
+    <> ": "
+    <> string.inspect(packet),
+  )
 
   let plaintext = connect_to_game_server.encode(packet)
   client.write(client, cipher.Ciphertext(plaintext.bits))

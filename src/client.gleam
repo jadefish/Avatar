@@ -1,76 +1,92 @@
-import cipher.{type Cipher}
+import aio.{type Closer, type Reader, type Writer}
+import cipher.{type Cipher, type Ciphertext, type Plaintext}
 import error
 import gleam/bit_array
-import gleam/bytes_tree
 import gleam/int
-import gleam/io
-import gleam/option.{type Option, None}
 import gleam/result
-import glisten
-import glisten/socket
-import glisten/tcp
-import utils as u
+import log
 
 pub const max_packet_size = 0xF000
 
-type Connection =
-  glisten.Connection(BitArray)
-
 pub type Client {
   Client(
-    conn: Connection,
-    login_seed: Option(cipher.Seed),
-    inbox: BitArray,
-    outbox: BitArray,
+    id: String,
+    // For now, a TCP client socket "IP:port" string
+    reader: Reader,
+    writer: Writer,
+    closer: Closer,
+    buffer: BitArray,
     cipher: Cipher,
   )
 }
 
-pub fn new(conn: Connection) {
-  Client(conn, None, <<>>, <<>>, cipher.nil())
+pub fn new(id: String, reader: Reader, writer: Writer, closer: Closer) {
+  Client(id, reader, writer, closer, <<>>, cipher.nil())
+}
+
+pub fn with_cipher(client: Client, cipher cipher: cipher.Cipher) -> Client {
+  Client(..client, cipher: cipher)
+}
+
+pub fn close(client: Client) -> Result(Client, error.Error) {
+  let _ = client.closer()
+  Ok(client)
 }
 
 pub fn inspect(client: Client) -> String {
-  u.connection_addr(glisten.get_client_info(client.conn))
+  client.id
 }
 
-fn socket_read(client: Client) -> Result(Client, socket.SocketReason) {
-  use data <- result.try(tcp.receive(client.conn.socket, 0))
-  let inbox = <<client.inbox:bits, data:bits>>
+fn underlying_read(client: Client, size) -> Result(Client, error.Error) {
+  // `size` assumed to be in the range 0 < size < |client.buffer|.
 
-  Ok(Client(..client, inbox:))
+  use data <- result.try(client.reader(size))
+  let buffer = <<client.buffer:bits, data:bits>>
+
+  log.debug(
+    inspect(client)
+    <> ": read "
+    <> int.to_string(bit_array.byte_size(data))
+    <> " from socket",
+  )
+
+  Ok(Client(..client, buffer:))
 }
 
 pub fn read(
   client: Client,
   size: Int,
-) -> Result(#(Client, cipher.Ciphertext), error.Error) {
-  let size = case size {
-    n if n < 0 -> 0
-    n if n > max_packet_size -> max_packet_size
-    _ -> size
-  }
-  let inbox_size = bit_array.byte_size(client.inbox)
+) -> Result(#(Client, Ciphertext), error.Error) {
+  let size = int.clamp(size, min: 0, max: max_packet_size)
+  let buffer_size = bit_array.byte_size(client.buffer)
   let wanted = int.to_string(size)
-  let have = int.to_string(inbox_size)
+  let have = int.to_string(buffer_size)
 
-  io.println(inspect(client) <> ": read: want " <> wanted <> ", have " <> have)
+  log.debug(inspect(client) <> ": read: want " <> wanted <> ", have " <> have)
 
   case size {
     0 -> Ok(#(client, cipher.Ciphertext(<<>>)))
 
-    n if n <= inbox_size -> {
-      io.println(inspect(client) <> ": read: pulling from inbox")
-      let assert <<bits:bytes-size(n), rest:bytes>> = client.inbox
-      let new_client = Client(..client, inbox: rest)
+    n if n <= buffer_size -> {
+      let assert <<bits:bytes-size(n), rest:bytes>> = client.buffer
+      let new_client = Client(..client, buffer: rest)
+
+      log.debug(
+        inspect(client)
+        <> ": read: pulled "
+        <> int.to_string(n)
+        <> " from buffer",
+      )
+
       Ok(#(new_client, cipher.Ciphertext(bits)))
     }
 
-    n if n > inbox_size -> {
-      io.println(inspect(client) <> ": read: reading from socket")
-      case socket_read(client) {
+    n if n > buffer_size -> {
+      log.debug(inspect(client) <> ": read: reading from socket")
+
+      case underlying_read(client, n - buffer_size) {
         Ok(new_client) -> read(new_client, size)
-        Error(reason) -> Error(error.ReadError(reason))
+        Error(error) -> Error(error)
       }
     }
 
@@ -78,11 +94,24 @@ pub fn read(
   }
 }
 
-pub fn write(
-  client: Client,
-  ciphertext: cipher.Ciphertext,
-) -> Result(Client, error.Error) {
-  let bytes = bytes_tree.from_bit_array(ciphertext.bits)
-  use _ <- u.try_map(tcp.send(client.conn.socket, bytes), error.WriteError)
+pub fn write(client: Client, data: Ciphertext) -> Result(Client, error.Error) {
+  use n <- result.try(client.writer(data.bits))
+
+  log.debug(inspect(client) <> ": wrote " <> int.to_string(n))
+
   Ok(client)
+}
+
+pub fn decrypt(client: Client, data: Ciphertext) -> #(Client, Plaintext) {
+  let #(cipher, plaintext) = cipher.decrypt(client.cipher, data)
+  let new_client = with_cipher(client, cipher: cipher)
+
+  #(new_client, plaintext)
+}
+
+pub fn encrypt(client: Client, data: Plaintext) -> #(Client, Ciphertext) {
+  let #(cipher, ciphertext) = cipher.encrypt(client.cipher, data)
+  let new_client = with_cipher(client, cipher: cipher)
+
+  #(new_client, ciphertext)
 }
