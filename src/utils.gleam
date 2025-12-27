@@ -1,3 +1,4 @@
+import envoy
 import gleam/int
 import gleam/result
 
@@ -82,5 +83,17 @@ fn pack_bytes_loop(acc: Int, bits: BitArray) -> Int {
       |> int.bitwise_or(next)
       |> pack_bytes_loop(rest)
     _ -> acc
+  }
+}
+
+/// Determines whether an environment variable has been enabled.
+///
+/// Unset environment variables and those set to "false" or the empty string are
+/// considered to not be enabled.
+/// Environment variables set to any other value are considered enabled.
+pub fn env_var_enabled(name: String) -> Bool {
+  case envoy.get(name) {
+    Error(_) | Ok("") | Ok("false") -> False
+    _ -> True
   }
 }

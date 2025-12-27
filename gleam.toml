@@ -20,6 +20,7 @@ glisten = ">= 8.0.1 and < 9.0.0"
 tzdata = ">= 1.1.3 and < 2.0.0"
 gleam_crypto = ">= 1.5.1 and < 2.0.0"
 logging = ">= 1.3.0 and < 2.0.0"
+envoy = ">= 1.1.0 and < 2.0.0"
 
 [dev-dependencies]
 gleeunit = ">= 1.9.0 and < 2.0.0"

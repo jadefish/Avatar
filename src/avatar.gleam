@@ -1,16 +1,39 @@
+import envoy
 import game_server
 import gleam/erlang/process
 import gleam/list
 import gleam/string
 import log
+import logging
 import login_server
 import time_zone as tz
 
 // TODO: Make login ports configurable. The defaults in UO's login.cfg specify 4
 // login servers running on two different ports (7775 and 7776).
 
+fn get_log_level() -> logging.LogLevel {
+  case envoy.get("AVATAR_LOG_LEVEL") {
+    Ok(level_string) -> {
+      case level_string |> string.lowercase {
+        "alert" -> logging.Alert
+        "critical" -> logging.Critical
+        "debug" -> logging.Debug
+        "emergency" -> logging.Emergency
+        "error" -> logging.Error
+        "notice" -> logging.Notice
+        "warning" -> logging.Warning
+        _ -> logging.Info
+      }
+    }
+
+    Error(_) -> logging.Info
+  }
+}
+
 pub fn main() {
-  log.configure()
+  let log_level = get_log_level()
+  log.configure(log_level)
+  log.debug("Log level set to " <> string.inspect(log_level))
 
   let auth_chan = process.new_subject()
   let login_servers = [

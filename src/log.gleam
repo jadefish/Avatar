@@ -1,10 +1,8 @@
 import logging.{Alert, Critical, Debug, Emergency, Error, Info, Notice, Warning}
 
-// Just a re-export so callers don't need to import both modules.
-pub fn configure() -> Nil {
+pub fn configure(level: logging.LogLevel) -> Nil {
   logging.configure()
-  // TODO: use an env var for this:
-  // logging.set_level(Debug)
+  logging.set_level(level)
 }
 
 pub fn emergency(string: String) -> Nil {
