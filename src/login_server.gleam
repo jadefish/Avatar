@@ -24,12 +24,16 @@ import tcp
 import time_zone as tz
 import utils as u
 
+// TODO: need listener import for get_server_info, but it's internal.
+import glisten/internal/listener
+
 /// A login server accepts a port and a parent subject. Once started, the server
 /// authenticates connecting clients. Clients that have been successfully
 /// authenticated are ready to be relayed to a game server.
 pub opaque type Server {
   Server(
     parent: Subject(LoginResult),
+    listener_name: process.Name(listener.Message),
     port: Int,
     pool_size: Int,
     clients: dict.Dict(glisten.ConnectionInfo, Client),
@@ -49,7 +53,8 @@ pub fn new(
   port port: Int,
   pool_size pool_size: Int,
 ) -> Subject(Action) {
-  let server = Server(parent, port, pool_size, dict.new())
+  let name = process.new_name("login_server")
+  let server = Server(parent, name, port, pool_size, dict.new())
   let assert Ok(actor.Started(_pid, subject)) =
     actor.new(server)
     |> actor.on_message(loop)
@@ -68,9 +73,12 @@ pub fn stop(subject: Subject(Action)) -> Subject(Action) {
 }
 
 fn inspect(server: Server) -> String {
-  // TODO: get IP from glisten? not sure how to get its process name for
-  // glisten's get_server_info function.
-  ansi.bold(ansi.magenta("LOGIN")) <> " 0.0.0.0:" <> int.to_string(server.port)
+  let glisten.ConnectionInfo(port, ip) =
+    glisten.get_server_info(server.listener_name, 1000)
+  let ip = glisten.ip_address_to_string(ip)
+  let port = int.to_string(port)
+
+  ansi.bold(ansi.magenta("LOGIN")) <> " " <> ip <> ":" <> port
 }
 
 fn find_client(
@@ -106,7 +114,10 @@ fn loop(server: Server, action: Action) -> actor.Next(Server, Action) {
         |> glisten.bind("0.0.0.0")
         |> glisten.with_pool_size(server.pool_size)
         // TODO: |> glisten.with_close(...) 
-        |> glisten.start(server.port)
+        // TODO: start_with_listener_name is marked @internal, but it's used
+        // in one of glisten's example programs. also, the listener_name is
+        // eventually needed by the inspect function, above.
+        |> glisten.start_with_listener_name(server.port, server.listener_name)
 
       case result {
         Ok(_supervisor) -> {
