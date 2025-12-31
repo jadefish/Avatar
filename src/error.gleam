@@ -18,7 +18,7 @@ pub type IOError {
 }
 
 pub type AuthenticationError {
-  InvalidCredentals
+  InvalidCredentials
   AccountInUse
   AccountBanned
 }

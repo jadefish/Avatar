@@ -1,9 +1,7 @@
 import ansi
 import client
-import gleam/bit_array
 import gleam/erlang/process.{type Subject}
 import gleam/int
-import gleam/io
 import gleam/option
 import gleam/otp/actor
 import gleam/string
@@ -94,47 +92,47 @@ fn handle_message(
   message: glisten.Message(a),
   conn: glisten.Connection(b),
 ) -> glisten.Next(Server, glisten.Message(a)) {
-  // User-type messages are never sent to the server's subject, so this
-  // assertion is safe.
-  let assert glisten.Packet(bits) = message
-  let addr = tcp.client_addr_string(conn)
+  // // User-type messages are never sent to the server's subject, so this
+  // // assertion is safe.
+  // let assert glisten.Packet(bits) = message
+  // let addr = tcp.client_addr_string(conn)
 
-  let client =
-    client.new(
-      addr,
-      tcp.reader(conn.socket, timeout: 5000),
-      tcp.writer(conn.socket),
-      tcp.closer(conn.socket),
-    )
+  // let client =
+  //   client.new(
+  //     addr,
+  //     tcp.reader(conn.socket, timeout: 5000),
+  //     tcp.writer(conn.socket),
+  //     tcp.closer(conn.socket),
+  //   )
 
-  // TODO: surely there's a better way to update these records.
-  let server = Server(..server, clients: [client, ..server.clients])
-  // let client_addr = tcp.connection_addr(glisten.get_client_info(conn))
-  // let client_addr = glisten.get_client_info(conn) |> result.map(fn(ci) { tcp.connection_addr2(ci) }) |> result.unwrap("(unknown)")
-  // let client_addr = tcp.socket_addr(tcp.Client(conn))
-  let size = bit_array.byte_size(bits)
+  // // TODO: surely there's a better way to update these records.
+  // let server = Server(..server, clients: [client, ..server.clients])
+  // // let client_addr = tcp.connection_addr(glisten.get_client_info(conn))
+  // // let client_addr = glisten.get_client_info(conn) |> result.map(fn(ci) { tcp.connection_addr2(ci) }) |> result.unwrap("(unknown)")
+  // // let client_addr = tcp.socket_addr(tcp.Client(conn))
+  // let size = bit_array.byte_size(bits)
 
-  // expecting 4 + 65 bytes: seed (IP, little endian; or whatever login server
-  // sent as new_key pre-relay?), plus account credentials?
+  // // expecting 4 + 65 bytes: seed (IP, little endian; or whatever login server
+  // // sent as new_key pre-relay?), plus account credentials?
 
-  // game_server(stopped:7080): 127.0.0.1:58638: 69 bytes:
-  //   <<
-  //     1, 0, 0, 127,
-  //     109, 131, 198, 172, 207, 117, 2, 250, 49, 125, 186, 84, 51, 118, 26, 115, 107, 206, 42, 7, 6, 176, 128, 133, 139, 65, 140, 132, 74, 197,
-  //     240, 191, 172, 18, 237, 82, 82, 99, 92, 165, 201, 234, 134, 216, 81, 194, 175, 195, 255, 22, 79, 214, 111, 224, 124, 102, 111, 146, 101, 164,
-  //     93, 9, 166, 12, 177
-  //   >>
+  // // game_server(stopped:7080): 127.0.0.1:58638: 69 bytes:
+  // //   <<
+  // //     1, 0, 0, 127,
+  // //     109, 131, 198, 172, 207, 117, 2, 250, 49, 125, 186, 84, 51, 118, 26, 115, 107, 206, 42, 7, 6, 176, 128, 133, 139, 65, 140, 132, 74, 197,
+  // //     240, 191, 172, 18, 237, 82, 82, 99, 92, 165, 201, 234, 134, 216, 81, 194, 175, 195, 255, 22, 79, 214, 111, 224, 124, 102, 111, 146, 101, 164,
+  // //     93, 9, 166, 12, 177
+  // //   >>
 
-  io.println(
-    inspect(server)
-    <> ": "
-    <> "client"
-    // TODO
-    <> ": "
-    <> int.to_string(size)
-    <> " bytes:\n\t"
-    <> bit_array.inspect(bits),
-  )
+  // io.println(
+  //   inspect(server)
+  //   <> ": "
+  //   <> "client"
+  //   // TODO
+  //   <> ": "
+  //   <> int.to_string(size)
+  //   <> " bytes:\n\t"
+  //   <> bit_array.inspect(bits),
+  // )
 
   glisten.continue(server)
 }
