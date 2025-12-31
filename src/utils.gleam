@@ -42,32 +42,24 @@ pub fn try_replace(
   result.try(result |> result.replace_error(error), fun)
 }
 
-/// Shorthand for `result.try(result |> result.map_error(mapping))`.
+/// An implementation of `result.unwrap` that works with `use`.
 ///
 /// ## Examples
 /// ```gleam
-/// type SomeError(a) {
-///   Kaboom(a)
-/// }
-///
-/// use foo <- try_map(Ok(4), Kaboom)
+/// use foo <- try_unwrap(Ok(4), 42)
 /// // Ok(4)
 ///
-/// use bar <- try_map(Error(-1), Kaboom)
-/// // Error(Kaboom(-1))
+/// use bar <- try_unwrap(Error(-1), 42)
+/// // 42
 /// ```
-pub fn try_map(
+pub fn try_unwrap(
   result: Result(a, e),
-  with mapping: fn(e) -> f,
-  apply fun: fn(a) -> Result(c, f),
-) -> Result(c, f) {
-  result.try(result |> result.map_error(mapping), fun)
-}
-
-pub fn lazy_unwrap_error(result: Result(a, e), or default: fn(a) -> e) -> e {
+  or default: f,
+  apply fun: fn(a) -> f,
+) -> f {
   case result {
-    Ok(v) -> default(v)
-    Error(e) -> e
+    Ok(v) -> fun(v)
+    Error(_) -> default
   }
 }
 
