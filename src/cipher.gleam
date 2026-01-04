@@ -3,6 +3,39 @@ import gleam/bool
 import gleam/bytes_tree.{type BytesTree}
 import gleam/int
 
+// TODO: The current implementation of this stream cipher is extremely weak.
+//
+// 1. Keys are fully determined by (IP, version), so e.g. two users using the
+// same client version behind a NAT would use the same keystream.
+// 2. There is no entropy in place.
+// 3. Key derivation is reversible (no hashing or KDF).
+// 4. Mask is derived from seed and will be repeated when seed is repeated.
+//
+// Stream ciphers are secure only when keystreams don't repeat. Since these are
+// based on small deterministic data, they're easily broken.
+// Per Wikipedia:
+//   > For a stream cipher to be secure, its keystream must have a large period,
+//   > and it must be impossible to recover the cipher's key or internal state
+//   > from the keystream.
+//
+// The ciphertext format cannot change, as that'd break client communication.
+// However, some hardening internal to the server can be added:
+//
+// 1. Per-session (or even per-command) nonce/salt XOR'd into the key (after
+// compute_key), before creating the mask.
+//   * Per Wikipedia: "Securely using a ... stream cipher requires that one
+//    never reuse the same keystream twice. ... a different nonce or key must
+//    be supplied to each invocation of the cipher."
+// 2. Pass (key1, key2, key3) through a KDF (along with the per-session salt/
+// nonce) to produce a stronger keystream without changing the ciphertext
+// format.
+// 3. HMAC ciphertext using server-side key to verify integrity and prevent
+// insertion of new messages.
+//   * Per Wikipedia: "... stream ciphers provide not authenticity but privacy:
+//   encrypted messages may still have been modified in transit."
+// 4. Rolling timer- or counter-based rekey (via changing session nonce)
+// 5. Future: consider XORing something modern like chacha20 on top of this.
+
 const lo_mask1 = 0x00001357
 
 const lo_mask2 = 0xffffaaaa
@@ -16,17 +49,17 @@ const hi_mask2 = 0xabcdffff
 const hi_mask3 = 0xffff0000
 
 // SERENITY NOW!
-const bnot = int.bitwise_not
+const not = int.bitwise_not
 
-const bor = int.bitwise_or
+const or = int.bitwise_or
 
-const band = int.bitwise_and
+const and = int.bitwise_and
 
-const bxor = int.bitwise_exclusive_or
+const xor = int.bitwise_exclusive_or
 
-const bsl = int.bitwise_shift_left
+const shift_left = int.bitwise_shift_left
 
-const bsr = int.bitwise_shift_right
+const shift_right = int.bitwise_shift_right
 
 // TODO: Opaque Seed is becoming clunky to use. It's nice to have "non-negative
 // integer" enforced by the constructor function, but is it worth the hassle?
@@ -71,7 +104,7 @@ pub opaque type Cipher {
 
 /// Truncate the provided integer to 32 bits.
 fn uint32(int: Int) -> Int {
-  band(int, 0xFFFFFFFF)
+  and(int, 0xFFFFFFFF)
 }
 
 /// Create a new login chiper, capable of decrypting packets sent during a
@@ -82,14 +115,14 @@ pub fn login(seed: Seed, version: Version) -> Cipher {
 
   // ((^seed ^ lo_mask1) << 16) | ((seed ^ lo_mask2) & lo_mask3)
   let mask_lo =
-    { bnot(value) |> bxor(lo_mask1) |> bsl(16) }
-    |> bor(value |> bxor(lo_mask2) |> band(lo_mask3))
+    { not(value) |> xor(lo_mask1) |> shift_left(16) }
+    |> or(value |> xor(lo_mask2) |> and(lo_mask3))
     |> uint32()
 
   // ((seed ^ hi_mask1) >> 16) | ((^seed ^ hi_mask2) & hi_mask3)
   let mask_hi =
-    { value |> bxor(hi_mask1) |> bsr(16) }
-    |> bor(bnot(value) |> bxor(hi_mask2) |> band(hi_mask3))
+    { value |> xor(hi_mask1) |> shift_right(16) }
+    |> or(not(value) |> xor(hi_mask2) |> and(hi_mask3))
     |> uint32()
 
   let mask = KeyPair(mask_lo, mask_hi)
@@ -158,24 +191,24 @@ fn login_decrypt_loop(
 
     <<byte:8, remaining_bytes:bytes>> -> {
       // dst[i] = src[i] ^ byte(cs.maskLo)
-      let plain_byte = band(mask.lo, 0xFF) |> bxor(byte)
+      let plain_byte = and(mask.lo, 0xFF) |> xor(byte)
 
       // cs.maskLo = ((maskLo >> 1) | (maskHi << 31)) ^ cs.keyLo
       let new_mask_lo =
-        bor(mask.lo |> bsr(1), mask.hi |> bsl(31))
-        |> bxor(key.lo)
+        or(mask.lo |> shift_right(1), mask.hi |> shift_left(31))
+        |> xor(key.lo)
         |> uint32()
 
       // maskHi = ((maskHi >> 1) | (maskLo << 31)) ^ cs.keyHi
       let mask_hi =
-        bor(mask.hi |> bsr(1), mask.lo |> bsl(31))
-        |> bxor(key.hi)
+        or(mask.hi |> shift_right(1), mask.lo |> shift_left(31))
+        |> xor(key.hi)
         |> uint32()
 
       // cs.maskHi = ((maskHi >> 1) | (maskLo << 31)) ^ cs.keyHi
       let new_mask_hi =
-        bor(mask_hi |> bsr(1), mask.lo |> bsl(31))
-        |> bxor(key.hi)
+        or(mask_hi |> shift_right(1), mask.lo |> shift_left(31))
+        |> xor(key.hi)
         |> uint32()
 
       let new_mask = KeyPair(new_mask_lo, new_mask_hi)
@@ -200,28 +233,34 @@ fn compute_key(a: Int, b: Int, c: Int) -> #(Int, Int, Int) {
   let c = uint32(c)
 
   // temp = (((a << 9) | b) << 10) | c) ^ ((c * c) << 5
-  let temp = a |> bsl(9) |> bor(b) |> bsl(10) |> bor(c) |> bxor(c * c |> bsl(5))
+  let temp =
+    a
+    |> shift_left(9)
+    |> or(b)
+    |> shift_left(10)
+    |> or(c)
+    |> xor(c * c |> shift_left(5))
 
   // key2 = (temp << 4) ^ (b * b) ^ (b * 0x0B000000) ^ (c * 0x380000) ^ 0x2C13A5FD
   let key2 =
-    bsl(temp, 4)
-    |> bxor(b * b)
-    |> bxor(b * 0x0B000000)
-    |> bxor(c * 0x00380000)
-    |> bxor(0x2C13A5FD)
+    shift_left(temp, 4)
+    |> xor(b * b)
+    |> xor(b * 0x0B000000)
+    |> xor(c * 0x00380000)
+    |> xor(0x2C13A5FD)
 
   // temp = (((((a << 9) | c) << 10) | b) * 8) ^ (c * c * 0x0c00)
   let temp =
-    { { bsl(a, 9) |> bor(c) |> bsl(10) |> bor(b) } * 8 }
-    |> bxor(c * c * 0x00000c00)
+    { { shift_left(a, 9) |> or(c) |> shift_left(10) |> or(b) } * 8 }
+    |> xor(c * c * 0x00000c00)
 
   // key3 = temp ^ (b * b) ^ (b * 0x6800000) ^ (c * 0x1c0000) ^ 0x0A31D527F
   let key3 =
     temp
-    |> bxor(b * b)
-    |> bxor(b * 0x06800000)
-    |> bxor(c * 0x001c0000)
-    |> bxor(0xA31D527F)
+    |> xor(b * b)
+    |> xor(b * 0x06800000)
+    |> xor(c * 0x001c0000)
+    |> xor(0xA31D527F)
 
   // key1 = key2 - 1
   let key1 = key2 - 1 |> uint32()
@@ -231,7 +270,7 @@ fn compute_key(a: Int, b: Int, c: Int) -> #(Int, Int, Int) {
 
 fn key_for_version(version: Version) -> KeyPair {
   case version {
-    // 2.0.3.x is a special case.
+    // 2.0.3.x (literal "x") is a special case.
     Version(2, 0, 3, 0x78) -> KeyPair(0x2D13A5FD, 0xA39D527F)
     Version(major, minor, patch, _) -> {
       let #(_, hi, lo) = compute_key(major, minor, patch)
